@@ -1,5 +1,6 @@
 import React from "react";
 import Logo from "../utilities/Logo";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 const Navbar = () => {
   return (
@@ -13,9 +14,9 @@ const Navbar = () => {
         <input
           type="text"
           placeholder="Search"
-          className="input input-bordered w-24 md:w-auto"
+          className="input input-bordered"
         />
-        <div className="dropdown dropdown-end">0</div>
+        <ThemeSwitcher />
       </div>
     </div>
   );

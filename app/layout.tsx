@@ -1,16 +1,8 @@
 import type { Metadata } from "next";
-import { Aldrich, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/shared/Navbar";
 import Footer from "@/components/shared/Footer";
 import Providers from "../providers/Providers";
-
-const aldrich = Aldrich({
-  variable: "--font-aldrich",
-  weight: ["400"],
-  style: ["normal"],
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -25,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <body
-        className={`${aldrich.variable} antialiased flex flex-col min-h-screen`}
+        className="antialiased flex flex-col min-h-screen"
       >
         <Providers>
           <header>
