@@ -5,7 +5,7 @@ import Link from "next/link";
 
 const Navbar = () => {
   return (
-    <div className="navbar bg-base-100 shadow-sm">
+    <div className="navbar bg-base-100 shadow-sm fixed top-0 inset-x-0 z-50">
       <div className="flex-1">
         <Link className="font-bold text-xl flex items-center gap-2" href="/">
           <Logo />

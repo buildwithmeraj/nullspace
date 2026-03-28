@@ -23,7 +23,8 @@ export default function RootLayout({
           <header>
             <Navbar />
           </header>
-          <main className="grow">{children}</main>
+          {/* Offset fixed navbar height (daisyUI navbar is ~4rem). */}
+          <main className="grow pt-16">{children}</main>
           <Footer />
         </Providers>
       </body>
