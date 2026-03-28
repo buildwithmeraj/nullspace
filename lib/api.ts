@@ -29,6 +29,15 @@ function setClientAccessToken(token: string) {
   }
 }
 
+function clearClientAccessToken() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem("accessToken");
+  } catch {
+    // ignore
+  }
+}
+
 export const api = axios.create({
   // Browser → same-origin proxy (`/api/*`). Server → direct backend base URL.
   baseURL: typeof window === "undefined" ? getApiBaseUrl() : "/api",
@@ -64,15 +73,25 @@ api.interceptors.response.use(
         typeof window === "undefined"
           ? `${getApiBaseUrl()}/users/refresh`
           : "/api/users/refresh";
-      const { data } = await axios.post<RefreshResponse>(
-        refreshUrl,
-        {},
-        { withCredentials: true },
-      );
-      config.headers = config.headers ?? {};
-      config.headers["Authorization"] = `Bearer ${data.accessToken}`;
-      setClientAccessToken(data.accessToken);
-      return api(config); // retry original request
+      try {
+        const { data } = await axios.post<RefreshResponse>(
+          refreshUrl,
+          {},
+          { withCredentials: true },
+        );
+        if (!data?.accessToken) {
+          clearClientAccessToken();
+          return Promise.reject(error);
+        }
+        config.headers = config.headers ?? {};
+        config.headers["Authorization"] = `Bearer ${data.accessToken}`;
+        setClientAccessToken(data.accessToken);
+        return api(config); // retry original request
+      } catch {
+        // Refresh cookie is missing/expired → clear cached token to avoid retry loops.
+        clearClientAccessToken();
+        return Promise.reject(error);
+      }
     }
     return Promise.reject(error);
   },
@@ -105,6 +124,7 @@ async function tryRefreshAccessToken(): Promise<string | null> {
     );
     return typeof data?.accessToken === "string" ? data.accessToken : null;
   } catch {
+    clearClientAccessToken();
     return null;
   }
 }

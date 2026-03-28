@@ -34,7 +34,7 @@ type AuthContextValue = {
   register: (input: RegisterInput) => Promise<AuthResult>;
   startGoogleLogin: () => void;
   logout: () => Promise<void>;
-  silentRefresh: () => Promise<void>;
+  silentRefresh: () => Promise<boolean>;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   setAccessToken: React.Dispatch<React.SetStateAction<string | null>>;
 };
@@ -155,10 +155,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const silentRefresh = async () => {
+  const silentRefresh = async (): Promise<boolean> => {
     // Hydrates the session on page load (and rotates tokens on the backend).
     const res = await authRequest("/users/refresh", { method: "POST" });
-    if (!res || !res.ok) return;
+    if (!res) return false;
+    if (!res.ok) {
+      // Refresh cookie is missing/invalid → treat as logged out and clear caches.
+      setUser(null);
+      setAccessToken(null);
+      sessionStorage.removeItem("accessToken");
+      // Don't auto-call `/users/logout` here: a transient refresh failure shouldn't wipe cookies.
+      return false;
+    }
     const json = await safeJson(res);
     const { user: nextUser, token: nextToken } = pickAuthPayload(json);
     if (nextToken) {
@@ -166,6 +174,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       sessionStorage.setItem("accessToken", nextToken);
     }
     if (nextUser) setUser(nextUser);
+    return Boolean(nextUser);
   };
 
   useEffect(() => {

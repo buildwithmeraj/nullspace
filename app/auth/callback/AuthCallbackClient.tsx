@@ -20,9 +20,11 @@ export default function AuthCallbackClient() {
       }
 
       // Prefer the refresh-cookie flow to hydrate user + rotate tokens.
-      await silentRefresh();
+      const ok = await silentRefresh();
 
-      if (!cancelled) router.replace("/profile");
+      if (cancelled) return;
+      // If the backend passed an access token, let the user reach `/profile` even if refresh couldn't hydrate yet.
+      router.replace(ok || Boolean(token) ? "/profile" : "/login");
     })();
 
     return () => {
