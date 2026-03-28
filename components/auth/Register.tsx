@@ -8,7 +8,7 @@ interface FormData {
   name: string;
   email: string;
   password: string;
-  image: string;
+  imageFile: File | null;
 }
 
 const Register = () => {
@@ -19,22 +19,70 @@ const Register = () => {
     name: "",
     email: "",
     password: "",
-    image: "",
+    imageFile: null,
   });
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // A generic change handler for multiple inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.type === "file") {
+      const file = e.target.files?.[0] ?? null;
+      setFormData({ ...formData, imageFile: file });
+      return;
+    }
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const body = new FormData();
+    // Backend is expected to read `file` and upload to Cloudinary.
+    // Your backend expects a single file field named `image`.
+    body.append("image", file);
+
+    const res = await fetch("/api/cloudinary/upload", {
+      method: "POST",
+      body,
+      credentials: "include",
+    });
+
+    const json = (await res.json().catch(() => null)) as
+      | { success?: boolean; data?: { url?: string } }
+      | null;
+
+    const url = json?.data?.url;
+    if (!res.ok || !json?.success || !url) {
+      throw new Error("Image upload failed");
+    }
+    return url;
   };
 
   // Submit handler function
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault(); // Prevent default page reload
     setError(null);
-    const res = await register(formData);
-    if (!res.ok) setError(res.error ?? "Registration failed");
-    else router.push("/profile");
+    try {
+      if (!formData.imageFile) {
+        setError("Please select an image file");
+        return;
+      }
+
+      setUploading(true);
+      const imageUrl = await uploadImage(formData.imageFile);
+
+      const res = await register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        image: imageUrl,
+      });
+      if (!res.ok) setError(res.error ?? "Registration failed");
+      else router.push("/profile");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -77,17 +125,16 @@ const Register = () => {
           />
           <label className="label">Photo</label>
           <input
-            type="url"
+            type="file"
             className="input"
-            placeholder="Photo"
+            accept="image/*"
             id="image"
             name="image"
-            value={formData.image}
             onChange={handleChange}
             required
           />
-          <button className="btn btn-neutral mt-4" disabled={loading}>
-            {loading ? "Loading..." : "Register"}
+          <button className="btn btn-neutral mt-4" disabled={loading || uploading}>
+            {uploading || loading ? "Loading..." : "Register"}
           </button>
           <div className="divider">OR</div>
           <button type="button" className="btn btn-outline" onClick={startGoogleLogin}>
