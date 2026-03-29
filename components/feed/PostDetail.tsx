@@ -1,10 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 
@@ -12,10 +9,7 @@ import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import RequireLogin from "@/components/auth/RequireLogin";
 import ErrorMsg from "@/components/utilities/Error";
-
-const MarkdownPreview = dynamic(() => import("@uiw/react-markdown-preview"), {
-  ssr: false,
-});
+import MarkdownContent from "@/components/markdown/MarkdownContent";
 
 type PostImage = { url: string; publicId?: string; width?: number; height?: number };
 type PostAuthor = { _id: string; name?: string; username?: string; image?: string } | null;
@@ -43,14 +37,7 @@ export default function PostDetail({
   const [post, setPost] = useState<Post | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const previewOptions = useMemo(
-    () => ({
-      remarkPlugins: [remarkGfm],
-      rehypePlugins: [rehypeHighlight],
-    }),
-    [],
-  );
+  const colorMode = resolvedTheme === "dark" ? "dark" : "light";
 
   useEffect(() => {
     let cancelled = false;
@@ -147,29 +134,7 @@ export default function PostDetail({
             ) : null}
           </div>
 
-          <div data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
-            <MarkdownPreview
-              source={post.content}
-              {...previewOptions}
-              components={{
-                a: ({ href, children, ...props }) => {
-                  const h = typeof href === "string" ? href : "";
-                  if (h.startsWith("/")) {
-                    return (
-                      <Link href={h} {...props}>
-                        {children}
-                      </Link>
-                    );
-                  }
-                  return (
-                    <a href={h} {...props}>
-                      {children}
-                    </a>
-                  );
-                },
-              }}
-            />
-          </div>
+          <MarkdownContent source={post.content} colorMode={colorMode} />
 
           {post.images?.length ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -189,4 +154,3 @@ export default function PostDetail({
     </div>
   );
 }
-

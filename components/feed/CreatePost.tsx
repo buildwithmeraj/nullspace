@@ -57,10 +57,19 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const [success, setSuccess] = useState<string | null>(null);
 
   const previewOptions = useMemo(
-    () => ({
-      remarkPlugins: [remarkGfm],
-      rehypePlugins: [rehypeHighlight],
-    }),
+    () => {
+      const highlight: [
+        typeof rehypeHighlight,
+        { detect: boolean; ignoreMissing: boolean },
+      ] = [rehypeHighlight, { detect: true, ignoreMissing: true }];
+
+      return {
+        remarkPlugins: [remarkGfm],
+        // `detect: true` highlights fenced blocks without an explicit language.
+        // `ignoreMissing: true` avoids runtime errors for unknown languages.
+        rehypePlugins: [highlight],
+      };
+    },
     [],
   );
 

@@ -1,19 +1,13 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { protectedApiRequest } from "@/lib/api";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
-import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/contexts/AuthContext";
 import InfoMsg from "@/components/utilities/Info";
 import RequireLogin from "@/components/auth/RequireLogin";
 import Link from "next/link";
-
-const MarkdownPreview = dynamic(() => import("@uiw/react-markdown-preview"), {
-  ssr: false,
-});
+import MarkdownContent from "@/components/markdown/MarkdownContent";
 
 type PostImage = { url: string; publicId?: string; width?: number; height?: number };
 type PostAuthor =
@@ -50,14 +44,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   const fetchedIdsRef = useRef<Set<string>>(new Set());
   const initKeyRef = useRef<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-  const previewOptions = useMemo(
-    () => ({
-      remarkPlugins: [remarkGfm],
-      rehypePlugins: [rehypeHighlight],
-    }),
-    [],
-  );
+  const colorMode = resolvedTheme === "dark" ? "dark" : "light";
 
   const loadMore = useCallback(async (reset = false) => {
     if (authLoading) return;
@@ -208,29 +195,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                 </div>
               ) : null}
             </div>
-            <div data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
-              <MarkdownPreview
-                source={post.content}
-                {...previewOptions}
-                components={{
-                  a: ({ href, children, ...props }) => {
-                    const h = typeof href === "string" ? href : "";
-                    if (h.startsWith("/")) {
-                      return (
-                        <Link href={h} {...props}>
-                          {children}
-                        </Link>
-                      );
-                    }
-                    return (
-                      <a href={h} {...props}>
-                        {children}
-                      </a>
-                    );
-                  },
-                }}
-              />
-            </div>
+            <MarkdownContent source={post.content} colorMode={colorMode} />
             {post.images?.length ? (
               <div className="grid grid-cols-2 gap-2">
                 {post.images.slice(0, 5).map((img, idx) => (

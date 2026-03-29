@@ -31,7 +31,38 @@
 
 /* Improve code block rendering in previews. */
 .wmde-markdown pre {
-  overflow-x: auto;
+  /* Wrap long lines to avoid horizontal scrolling in the feed/post views. */
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: hidden;
+}
+
+/* Preserve plain-text newlines inside markdown paragraphs/lists (developer-friendly). */
+.wmde-markdown p,
+.wmde-markdown li {
+  white-space: pre-wrap;
+}
+
+/* highlight.js github.css sets `pre code.hljs { overflow-x: auto; }`; override to wrap. */
+.wmde-markdown pre code.hljs {
+  display: block;
+  overflow-x: hidden !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  background: transparent !important; /* container provides bg; prevents toolbar mismatch */
+}
+
+/* Make inline-highlighted snippets show a language tag (used by `MarkdownContent`). */
+.wmde-markdown code.hljs[data-language] {
+  position: relative;
+}
+.wmde-markdown code.hljs[data-language]::after {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  font-size: 10px;
+  opacity: 0.7;
 }
 
 /* Dark-mode overrides for highlight.js tokens (scoped via `data-color-mode="dark"`). */
