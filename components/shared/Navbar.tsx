@@ -6,6 +6,7 @@ import ThemeSwitcher from "./ThemeSwitcher";
 import Link from "next/link";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 import { useAuth } from "@/contexts/AuthContext";
+import NavSearch from "@/components/shared/NavSearch";
 
 const Navbar = () => {
   const { user, loading } = useAuth();
@@ -17,11 +18,7 @@ const Navbar = () => {
         </Link>
       </div>
       <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Search"
-          className="input input-bordered"
-        />
+        <NavSearch />
         {!loading && user ? <NotificationsBell /> : null}
         <ThemeSwitcher />
       </div>
