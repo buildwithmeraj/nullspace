@@ -15,12 +15,16 @@ const MarkdownPreview = dynamic(() => import("@uiw/react-markdown-preview"), {
 });
 
 type PostImage = { url: string; publicId?: string; width?: number; height?: number };
+type PostAuthor =
+  | { _id: string; name?: string; username?: string; image?: string }
+  | null;
 type Post = {
   _id: string;
   content: string;
   images?: PostImage[];
   createdAt?: string;
   userId?: string;
+  user?: PostAuthor;
 };
 
 type PostsResponse = { success?: boolean; message?: string; data?: Post[] };
@@ -106,6 +110,45 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
       {posts.map((post) => (
         <article key={post._id} className="card bg-base-100 shadow">
           <div className="card-body space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="avatar">
+                  <div className="w-10 rounded-full bg-base-200">
+                    {post.user?.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={String(post.user.image ?? "")}
+                        alt="Author"
+                        className="object-cover"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="text-sm leading-tight">
+                  {post.user?.username ? (
+                    <Link
+                      className="font-semibold link link-hover block"
+                      href={`/d/${encodeURIComponent(post.user.username)}`}
+                    >
+                      {String(post.user.name ?? post.user.username)}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold block">
+                      {String(post.user?.name ?? "Unknown")}
+                    </span>
+                  )}
+                  {post.user?.username ? (
+                    <span className="opacity-70 block">@{post.user.username}</span>
+                  ) : null}
+                </div>
+              </div>
+              {post.createdAt ? (
+                <div className="text-xs opacity-60">
+                  {new Date(post.createdAt).toLocaleString()}
+                </div>
+              ) : null}
+            </div>
             <div data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
               <MarkdownPreview source={post.content} {...previewOptions} />
             </div>

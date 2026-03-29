@@ -9,13 +9,13 @@ type AuthResult<T = unknown> =
   | { ok: false; error?: string };
 
 type AuthUser = Record<string, unknown> & {
+  _id?: string;
   id?: string;
   name?: string;
   username?: string;
   email?: string;
   role?: string;
   image?: string;
-  avatar?: string;
   bio?: string;
   createdAt?: string;
 };

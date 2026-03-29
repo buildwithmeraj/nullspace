@@ -87,8 +87,8 @@ export default function UpdateProfile() {
         return;
       }
 
-      // Avatar and profile picture are treated as the same in the frontend.
-      let nextImageUrl = String(user.image ?? user.avatar ?? "").trim();
+      // Avatar and profile picture are merged; `image` is the canonical field.
+      let nextImageUrl = String(user.image ?? "").trim();
       if (form.imageFile) {
         setUploading(true);
         nextImageUrl = await uploadImage(form.imageFile);
@@ -100,7 +100,6 @@ export default function UpdateProfile() {
         username,
         bio: form.bio.trim(),
         image: nextImageUrl,
-        avatar: nextImageUrl,
       };
 
       const res = await protectedApiRequest<UpdateProfileResponse>({

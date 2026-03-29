@@ -57,11 +57,11 @@ const Profile = () => {
             </div>
           </div>
 
-          {user.image || user.avatar ? (
+          {user.image ? (
             <div className="pt-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={String(user.image ?? user.avatar ?? "")}
+                src={String(user.image ?? "")}
                 alt="Profile"
                 className="rounded-md object-cover w-24 h-24"
               />
