@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationsContext";
 
 const ALLOWED_WHEN_MISSING_USERNAME = new Set([
   "/login",
@@ -17,6 +17,7 @@ export default function UsernameGate() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const { pushLocal } = useNotifications();
 
   useEffect(() => {
     if (loading) return;
@@ -32,7 +33,7 @@ export default function UsernameGate() {
     try {
       if (!sessionStorage.getItem(key)) {
         sessionStorage.setItem(key, "1");
-        toast.error("Set a username to continue");
+        pushLocal("You must complete your profile (set a username) to continue.");
       }
     } catch {
       // ignore
@@ -40,7 +41,7 @@ export default function UsernameGate() {
 
     const next = pathname ? `&next=${encodeURIComponent(pathname)}` : "";
     router.replace(`/profile/edit?reason=complete_profile${next}`);
-  }, [loading, pathname, router, user]);
+  }, [loading, pathname, pushLocal, router, user]);
 
   return null;
 }

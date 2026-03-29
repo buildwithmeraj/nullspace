@@ -41,6 +41,32 @@ export default function DeveloperProfile({ username }: { username: string }) {
     return String(user.id ?? user._id ?? "");
   }, [user]);
 
+  const load = async (normalizedUsername: string, uid: string) => {
+    const u = await protectedApiRequest<ApiResponse<PublicUser>>({
+      url: `/users/username/${encodeURIComponent(normalizedUsername)}`,
+      method: "GET",
+    });
+    if (!u?.success || !u.data?._id) {
+      throw new Error(u?.message ?? "Failed to load profile");
+    }
+
+    const friends = await protectedApiRequest<ApiResponse<Friend[]>>({
+      url: "/friends",
+      method: "GET",
+    });
+    const list = friends?.data ?? [];
+    const rel = list.find((f) => {
+      const a = String(f.requesterId);
+      const b = String(f.recipientId);
+      return (
+        (a === String(uid) && b === String(u.data!._id)) ||
+        (a === String(u.data!._id) && b === String(uid))
+      );
+    });
+
+    return { dev: u.data, relationship: rel ?? null };
+  };
+
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -54,31 +80,16 @@ export default function DeveloperProfile({ username }: { username: string }) {
 
       try {
         const normalized = username.replace(/^@/, "");
-        const u = await protectedApiRequest<ApiResponse<PublicUser>>({
-          url: `/users/username/${encodeURIComponent(normalized)}`,
-          method: "GET",
-        });
-        if (!u?.success || !u.data?._id) {
-          throw new Error(u?.message ?? "Failed to load profile");
-        }
         if (cancelled) return;
-        setDev(u.data);
-
-        // Load current user's relationships and find the one relevant to this profile.
-        const friends = await protectedApiRequest<ApiResponse<Friend[]>>({
-          url: "/friends",
-          method: "GET",
-        });
-        const list = friends?.data ?? [];
-        const rel = list.find((f) => {
-          const a = String(f.requesterId);
-          const b = String(f.recipientId);
-          return (
-            (a === String(meId) && b === String(u.data!._id)) ||
-            (a === String(u.data!._id) && b === String(meId))
-          );
-        });
-        if (!cancelled) setRelationship(rel ?? null);
+        const uid = String(meId ?? "");
+        if (!uid) throw new Error("Unauthorized");
+        const { dev: nextDev, relationship: nextRel } = await load(
+          normalized,
+          uid,
+        );
+        if (cancelled) return;
+        setDev(nextDev);
+        setRelationship(nextRel);
       } catch (e) {
         if (!cancelled)
           setError(e instanceof Error ? e.message : "Failed to load profile");
@@ -113,6 +124,52 @@ export default function DeveloperProfile({ username }: { username: string }) {
     }
   };
 
+  const acceptRequest = async () => {
+    if (!relationship?._id) return;
+    setBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      await protectedApiRequest({
+        url: `/friends/${encodeURIComponent(relationship._id)}`,
+        method: "PATCH",
+      });
+      setInfo("Alliance request accepted");
+      const normalized = username.replace(/^@/, "");
+      const uid = String(meId ?? "");
+      const next = await load(normalized, uid);
+      setDev(next.dev);
+      setRelationship(next.relationship);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to accept request");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rejectRequest = async () => {
+    if (!relationship?._id) return;
+    setBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      await protectedApiRequest({
+        url: `/friends/${encodeURIComponent(relationship._id)}`,
+        method: "DELETE",
+      });
+      setInfo("Alliance request rejected");
+      const normalized = username.replace(/^@/, "");
+      const uid = String(meId ?? "");
+      const next = await load(normalized, uid);
+      setDev(next.dev);
+      setRelationship(next.relationship);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reject request");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) return <div className="opacity-70 text-sm">Loading…</div>;
   if (!user)
     return (
@@ -133,6 +190,11 @@ export default function DeveloperProfile({ username }: { username: string }) {
     String(dev.username ?? "").trim() === String(user.username ?? "").trim();
 
   const displayImage = String(dev.image ?? "").trim();
+  const relStatus = relationship?.status;
+  const isIncomingPending =
+    relStatus === "pending" &&
+    String(relationship?.requesterId ?? "") === String(dev._id) &&
+    String(relationship?.recipientId ?? "") === String(meId ?? "");
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 sm:px-4 py-6 space-y-4">
@@ -165,6 +227,23 @@ export default function DeveloperProfile({ username }: { username: string }) {
               </Link>
             ) : relationship?.status === "accepted" ? (
               <div className="badge badge-success badge-outline">Alliance</div>
+            ) : isIncomingPending ? (
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn btn-sm btn-success"
+                  onClick={() => void acceptRequest()}
+                  disabled={busy}
+                >
+                  {busy ? "Working…" : "Accept"}
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => void rejectRequest()}
+                  disabled={busy}
+                >
+                  Reject
+                </button>
+              </div>
             ) : relationship?.status === "pending" ? (
               <div className="badge badge-warning badge-outline">
                 Request pending

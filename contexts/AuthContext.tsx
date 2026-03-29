@@ -134,28 +134,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     window.location.assign(isAbsoluteUrl ? googlePath : toProxyUrl(googlePath));
   };
 
-  const authRequest = async (path: string, init?: RequestInit) => {
-    const base = getApiBaseUrl();
-    // Always include cookies so the backend can read/rotate the refreshToken session cookie.
-    const url =
-      typeof window === "undefined"
-        ? base
-          ? `${base}${path}`
-          : toProxyUrl(path)
-        : toProxyUrl(path);
-    try {
-      return await fetch(url, {
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          ...(init?.headers ?? {}),
-        },
-        credentials: "include",
-      });
-    } catch {
-      return null;
-    }
-  };
+	  const authRequest = async (path: string, init?: RequestInit) => {
+	    const base = getApiBaseUrl();
+	    // Always include cookies so the backend can read/rotate the refreshToken session cookie.
+	    const url =
+	      typeof window === "undefined"
+	        ? base
+	          ? `${base}${path}`
+	          : toProxyUrl(path)
+	        : toProxyUrl(path);
+	    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	    const controller = init?.signal ? null : new AbortController();
+	    try {
+	      const timeoutMs = 12_000;
+	      timeoutId =
+	        controller != null ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+	      return await fetch(url, {
+	        ...init,
+	        headers: {
+	          "Content-Type": "application/json",
+	          ...(init?.headers ?? {}),
+	        },
+	        credentials: "include",
+	        signal: init?.signal ?? controller?.signal,
+	      });
+	    } catch {
+	      return null;
+	    } finally {
+	      if (timeoutId != null) clearTimeout(timeoutId);
+	    }
+	  };
 
   const silentRefresh = async (): Promise<boolean> => {
     // Hydrates the session on page load (and rotates tokens on the backend).

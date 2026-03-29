@@ -14,17 +14,23 @@ export default function AuthCallbackClient() {
     let cancelled = false;
     (async () => {
       const token = params.get("token");
-      if (token) {
-        setAccessToken(token);
-        sessionStorage.setItem("accessToken", token);
+      try {
+        if (token) {
+          // If the backend gave us a token, don't block the redirect on a refresh call.
+          setAccessToken(token);
+          sessionStorage.setItem("accessToken", token);
+          if (!cancelled) router.replace("/profile");
+        }
+
+        // Prefer the refresh-cookie flow to hydrate user + rotate tokens.
+        const ok = await silentRefresh();
+
+        if (cancelled) return;
+        // If we didn't already redirect (token-less flow), decide where to land.
+        if (!token) router.replace(ok ? "/profile" : "/login");
+      } catch {
+        if (!cancelled) router.replace(token ? "/profile" : "/login");
       }
-
-      // Prefer the refresh-cookie flow to hydrate user + rotate tokens.
-      const ok = await silentRefresh();
-
-      if (cancelled) return;
-      // If the backend passed an access token, let the user reach `/profile` even if refresh couldn't hydrate yet.
-      router.replace(ok || Boolean(token) ? "/profile" : "/login");
     })();
 
     return () => {

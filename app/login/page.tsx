@@ -1,7 +1,12 @@
 "use client";
 
-import Login from "@/components/auth/Login";
+import { Suspense } from "react";
+import LoginClient from "@/components/auth/LoginClient";
 
-const Page = () => <Login />;
+const Page = () => (
+  <Suspense fallback={null}>
+    <LoginClient />
+  </Suspense>
+);
 
 export default Page;
