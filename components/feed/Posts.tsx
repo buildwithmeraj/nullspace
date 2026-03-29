@@ -142,7 +142,16 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
               </div>
               {post.createdAt ? (
                 <div className="text-xs opacity-60">
-                  {new Date(post.createdAt).toLocaleString()}
+                  {post.user?.username ? (
+                    <Link
+                      className="link link-hover"
+                      href={`/d/${encodeURIComponent(post.user.username)}/post/${encodeURIComponent(post._id)}`}
+                    >
+                      {new Date(post.createdAt).toLocaleString()}
+                    </Link>
+                  ) : (
+                    new Date(post.createdAt).toLocaleString()
+                  )}
                 </div>
               ) : null}
             </div>
