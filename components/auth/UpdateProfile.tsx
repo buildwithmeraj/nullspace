@@ -6,6 +6,7 @@ import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import InfoMsg from "@/components/utilities/Info";
 import { useSearchParams } from "next/navigation";
+import RequireLogin from "@/components/auth/RequireLogin";
 
 type UpdateProfileResponse = {
   success?: boolean;
@@ -127,7 +128,14 @@ export default function UpdateProfile() {
   };
 
   if (loading) return null;
-  if (!user) return null;
+  if (!user)
+    return (
+      <RequireLogin
+        title="Edit profile"
+        message={<span className="text-sm">Log in to edit your profile.</span>}
+        nextPath="/profile/edit"
+      />
+    );
 
   const redirected =
     params.get("reason") === "complete_profile" || Boolean(params.get("next"));

@@ -1,21 +1,15 @@
 "use client";
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import Link from "next/link";
 import InfoMsg from "@/components/utilities/Info";
+import RequireLogin from "@/components/auth/RequireLogin";
+import Link from "next/link";
 
-const Profile = () => {
+  const Profile = () => {
   const { user, loading, logout } = useAuth();
   if (loading) return <div>Loading...</div>;
   if (!user)
-    return (
-      <div className="space-y-2">
-        <div>Not logged in</div>
-        <Link className="link" href="/login">
-          Go to login
-        </Link>
-      </div>
-    );
+    return <RequireLogin title="Profile" message={<span className="text-sm">Log in to view your profile.</span>} />;
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
       <section className="card bg-base-100 shadow">

@@ -221,6 +221,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (nextToken) setAccessToken(nextToken);
       if (nextUser) setUser(nextUser);
       if (nextToken) sessionStorage.setItem("accessToken", nextToken);
+      try {
+        // Clear any stored post-login redirect once we have a session.
+        sessionStorage.removeItem("postLoginRedirect");
+      } catch {
+        // ignore
+      }
       return { ok: true, data: json ?? undefined };
     } catch (e) {
       return {

@@ -11,7 +11,7 @@ interface FormData {
   password: string;
 }
 
-const Login = () => {
+const Login = ({ nextPath }: { nextPath?: string | null }) => {
   const { login, loading, startGoogleLogin } = useAuth();
   const router = useRouter();
   // Manage form state
@@ -33,7 +33,7 @@ const Login = () => {
       setError(null);
       const res = await login(formData);
       if (!res.ok) setError(res.error ?? "Login failed");
-      else router.push("/profile");
+      else router.replace(nextPath || "/profile");
     } catch (error) {
       console.error("Login error:", error);
       setError("Login failed");

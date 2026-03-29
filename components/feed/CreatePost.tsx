@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -10,6 +10,7 @@ import rehypeHighlight from "rehype-highlight";
 import { useAuth } from "@/contexts/AuthContext";
 import { protectedApiRequest } from "@/lib/api";
 import InfoMsg from "@/components/utilities/Info";
+import RequireLogin from "@/components/auth/RequireLogin";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
@@ -26,10 +27,28 @@ type UploadResponse =
 const MAX_CHARS = 10_000;
 const MAX_IMAGES = 5;
 
+type MentionUser = { _id: string; name?: string; username: string; image?: string };
+type SearchUsersResponse = { success?: boolean; data?: MentionUser[] };
+
+function getMentionMatch(text: string, caret: number) {
+  const before = text.slice(0, caret);
+  // Match "@foo" at the end of the current token.
+  const match = before.match(/(^|\\s)@([a-zA-Z0-9_]{1,24})$/);
+  if (!match) return null;
+  const query = match[2] ?? "";
+  const start = caret - query.length - 1; // index of "@"
+  return { query, start, end: caret };
+}
+
 const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const { user, loading } = useAuth();
   const { resolvedTheme } = useTheme();
   const [content, setContent] = useState<string>("");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mention, setMention] = useState<{ query: string; start: number; end: number } | null>(null);
+  const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -54,6 +73,24 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const username = String(user?.username ?? "").trim();
   const needsUsername = Boolean(user) && !username;
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
+
+  useEffect(() => {
+    if (!mention?.query || !mentionOpen) return;
+
+    const handle = setTimeout(() => {
+      void (async () => {
+        const res = await protectedApiRequest<SearchUsersResponse>({
+          url: `/users/search?query=${encodeURIComponent(mention.query)}`,
+          method: "GET",
+        }).catch(() => null);
+        const users = res?.data ?? [];
+        setMentionUsers(users);
+        setMentionIndex(0);
+      })();
+    }, 250);
+
+    return () => clearTimeout(handle);
+  }, [mention?.query, mentionOpen]);
 
   useEffect(() => {
     // Maintain local object URLs for selected images and clean them up.
@@ -150,6 +187,63 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     }
   };
 
+  const insertMention = (u: MentionUser) => {
+    if (!mention) return;
+    const label = `@${u.username}`;
+    const href = `/d/${encodeURIComponent(u.username)}`;
+    const md = `[${label}](${href}) `;
+
+    const next = content.slice(0, mention.start) + md + content.slice(mention.end);
+    setContent(next);
+    setMentionOpen(false);
+    setMention(null);
+
+    // Put caret right after inserted mention.
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const pos = mention.start + md.length;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const handleTextareaKeyUp = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget;
+    textareaRef.current = el;
+    const caret = el.selectionStart ?? 0;
+    const m = getMentionMatch(el.value, caret);
+    if (!m) {
+      setMentionOpen(false);
+      setMention(null);
+      return;
+    }
+    setMention(m);
+    setMentionOpen(true);
+  };
+
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    textareaRef.current = e.currentTarget;
+    if (!mentionOpen) return;
+    if (!mentionUsers.length) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMentionIndex((i) => Math.min(i + 1, mentionUsers.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMentionIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      const u = mentionUsers[mentionIndex];
+      if (u) insertMention(u);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setMentionOpen(false);
+      setMention(null);
+    }
+  };
+
   return (
     <section className="card bg-base-100 w-full shadow-xl">
       <div className="card-body space-y-3">
@@ -168,9 +262,12 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
         {loading ? (
           <div className="text-sm opacity-70">Checking session…</div>
         ) : !user ? (
-          <div className="text-sm">
-            You need to <Link className="link" href="/login">log in</Link> to create a post.
-          </div>
+          <RequireLogin
+            title="Create post"
+            message={
+              <span className="text-sm">Log in to create a post.</span>
+            }
+          />
         ) : needsUsername ? (
           <InfoMsg
             message={
@@ -196,9 +293,55 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
                 previewOptions={previewOptions}
                 textareaProps={{
                   placeholder: "Write your post in Markdown…",
+                  onKeyUp: handleTextareaKeyUp,
+                  onKeyDown: handleTextareaKeyDown,
                 }}
               />
             </div>
+
+            {mentionOpen && mention?.query ? (
+              <div className="border border-base-300 rounded-md bg-base-100">
+                <div className="px-3 py-2 text-xs opacity-70">
+                  Mention: @{mention.query}
+                </div>
+                {mentionUsers.length ? (
+                  <ul className="menu menu-sm">
+                    {mentionUsers.map((u, idx) => (
+                      <li key={u._id}>
+                        <button
+                          type="button"
+                          className={idx === mentionIndex ? "active" : ""}
+                          onMouseDown={(ev) => {
+                            // Prevent editor blur before we insert.
+                            ev.preventDefault();
+                            insertMention(u);
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="avatar">
+                              <div className="w-6 rounded-full bg-base-200">
+                                {u.image ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={u.image} alt={u.username} />
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="text-left">
+                              <div className="text-sm font-medium">
+                                {String(u.name ?? u.username)}
+                              </div>
+                              <div className="text-xs opacity-70">@{u.username}</div>
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="px-3 py-2 text-sm opacity-70">No users found.</div>
+                )}
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-between gap-3">
               <input

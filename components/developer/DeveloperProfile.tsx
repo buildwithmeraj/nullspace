@@ -4,9 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import InfoMsg from "@/components/utilities/Info";
 import ErrorMsg from "@/components/utilities/Error";
 import SuccessMsg from "@/components/utilities/Success";
+import RequireLogin from "@/components/auth/RequireLogin";
 
 type PublicUser = {
   _id: string;
@@ -173,10 +173,11 @@ export default function DeveloperProfile({ username }: { username: string }) {
   if (loading) return <div className="opacity-70 text-sm">Loading…</div>;
   if (!user)
     return (
-      <InfoMsg
+      <RequireLogin
+        title="Developer profile"
         message={
           <span className="text-sm">
-            You need to <Link className="link" href="/login">log in</Link> to view developer profiles.
+            Log in to view developer profiles.
           </span>
         }
       />

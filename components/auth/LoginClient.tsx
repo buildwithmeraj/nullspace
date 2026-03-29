@@ -3,10 +3,20 @@
 import InfoMsg from "@/components/utilities/Info";
 import Login from "@/components/auth/Login";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 export default function LoginClient() {
   const params = useSearchParams();
   const error = params.get("error");
+  const next = params.get("next");
+  const [storedNext] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return sessionStorage.getItem("postLoginRedirect");
+    } catch {
+      return null;
+    }
+  });
 
   return (
     <div className="space-y-3">
@@ -20,8 +30,7 @@ export default function LoginClient() {
           }
         />
       ) : null}
-      <Login />
+      <Login nextPath={next ?? storedNext} />
     </div>
   );
 }
-

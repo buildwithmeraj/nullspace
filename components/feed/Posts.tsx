@@ -7,8 +7,9 @@ import rehypeHighlight from "rehype-highlight";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/contexts/AuthContext";
-import Link from "next/link";
 import InfoMsg from "@/components/utilities/Info";
+import RequireLogin from "@/components/auth/RequireLogin";
+import Link from "next/link";
 
 const MarkdownPreview = dynamic(() => import("@uiw/react-markdown-preview"), {
   ssr: false,
@@ -82,11 +83,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
     return <div className="opacity-70 text-sm">Loading posts…</div>;
 
   if (!user)
-    return (
-      <div className="opacity-70 text-sm">
-        You need to <Link className="link" href="/login">log in</Link> to see posts.
-      </div>
-    );
+    return <RequireLogin title="Feed" message={<span className="text-sm">Log in to see posts.</span>} />;
 
   if (needsUsername)
     return (
@@ -150,7 +147,27 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
               ) : null}
             </div>
             <div data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
-              <MarkdownPreview source={post.content} {...previewOptions} />
+              <MarkdownPreview
+                source={post.content}
+                {...previewOptions}
+                components={{
+                  a: ({ href, children, ...props }) => {
+                    const h = typeof href === "string" ? href : "";
+                    if (h.startsWith("/")) {
+                      return (
+                        <Link href={h} {...props}>
+                          {children}
+                        </Link>
+                      );
+                    }
+                    return (
+                      <a href={h} {...props}>
+                        {children}
+                      </a>
+                    );
+                  },
+                }}
+              />
             </div>
             {post.images?.length ? (
               <div className="grid grid-cols-2 gap-2">
