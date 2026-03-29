@@ -42,6 +42,8 @@ export const api = axios.create({
   // Browser → same-origin proxy (`/api/*`). Server → direct backend base URL.
   baseURL: typeof window === "undefined" ? getApiBaseUrl() : "/api",
   withCredentials: true,
+  // Prevent UI hangs when the backend is unreachable.
+  timeout: 12_000,
 });
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
@@ -77,7 +79,7 @@ api.interceptors.response.use(
         const { data } = await axios.post<RefreshResponse>(
           refreshUrl,
           {},
-          { withCredentials: true },
+          { withCredentials: true, timeout: 12_000 },
         );
         if (!data?.accessToken) {
           clearClientAccessToken();
@@ -120,7 +122,7 @@ async function tryRefreshAccessToken(): Promise<string | null> {
     const { data } = await axios.post<RefreshResponse>(
       refreshUrl,
       {},
-      { withCredentials: true },
+      { withCredentials: true, timeout: 12_000 },
     );
     return typeof data?.accessToken === "string" ? data.accessToken : null;
   } catch {

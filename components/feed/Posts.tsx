@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { protectedApiRequest } from "@/lib/api";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -28,15 +28,28 @@ type Post = {
   user?: PostAuthor;
 };
 
-type PostsResponse = { success?: boolean; message?: string; data?: Post[] };
+type FeedResponse = {
+  success?: boolean;
+  message?: string;
+  data?: { posts?: Post[]; hasMore?: boolean };
+};
+
+const PAGE_SIZE = 15;
 
 const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  // "loading" is only for the initial page load. If the user is logged out we
+  // should render the login placeholder instead of being stuck in a loading UI.
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const { resolvedTheme } = useTheme();
   const { user, loading: authLoading } = useAuth();
   const username = String(user?.username ?? "").trim();
   const needsUsername = Boolean(user) && !username;
+  const fetchedIdsRef = useRef<Set<string>>(new Set());
+  const initKeyRef = useRef<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const previewOptions = useMemo(
     () => ({
@@ -46,38 +59,78 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
     [],
   );
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        if (authLoading) return;
-        if (!user) return;
-        if (needsUsername) return;
+  const loadMore = useCallback(async (reset = false) => {
+    if (authLoading) return;
+    if (!user) return;
+    if (needsUsername) return;
+    if (!hasMore && !reset) return;
+    if (loadingMore) return;
 
-        // Fetch friends feed first, then append public posts (de-duplicated).
-        const friendsRes = await protectedApiRequest<PostsResponse>({
-          url: "/posts/friends",
-          method: "GET",
-        }).catch(() => null);
-
-        const publicRes = await protectedApiRequest<PostsResponse>({
-          url: "/posts",
-          method: "GET",
-        });
-
-        const friendsPosts = friendsRes?.data ?? [];
-        const publicPosts = publicRes?.data ?? [];
-
-        const seen = new Set(friendsPosts.map((p) => p._id));
-        const merged = [...friendsPosts, ...publicPosts.filter((p) => !seen.has(p._id))];
-
-        setPosts(merged);
-      } catch (e) {
-        console.error("Failed to fetch posts:", e);
-      } finally {
-        setLoading(false);
+    if (reset) setLoading(true);
+    setLoadingMore(true);
+    try {
+      if (reset) {
+        fetchedIdsRef.current = new Set();
+        setPosts([]);
+        setHasMore(true);
       }
-    })();
-  }, [authLoading, needsUsername, refreshKey, user]);
+
+      const excludeIds = Array.from(fetchedIdsRef.current);
+      const res = await protectedApiRequest<FeedResponse>({
+        url: "/posts/feed",
+        method: "POST",
+        data: { limit: PAGE_SIZE, excludeIds },
+      });
+
+      const nextPosts = res?.data?.posts ?? [];
+      const nextHasMore = Boolean(res?.data?.hasMore);
+
+      const unique = nextPosts.filter((p) => !fetchedIdsRef.current.has(p._id));
+      unique.forEach((p) => fetchedIdsRef.current.add(p._id));
+
+      setPosts((prev) => (reset ? unique : [...prev, ...unique]));
+      setHasMore(nextHasMore);
+    } catch (e) {
+      console.error("Failed to fetch feed:", e);
+      setHasMore(false);
+    } finally {
+      if (reset) setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [authLoading, hasMore, loadingMore, needsUsername, user]);
+
+  useEffect(() => {
+    // Initial load should wait for auth to resolve; otherwise we may skip the
+    // request and never re-run if we only depend on `refreshKey`.
+    if (authLoading) return;
+    if (!user) return;
+    if (needsUsername) return;
+
+    const uid = String(user.id ?? user._id ?? "");
+    const key = `${uid}:${String(refreshKey ?? 0)}`;
+    if (initKeyRef.current === key) return;
+    initKeyRef.current = key;
+
+    void loadMore(true);
+  }, [authLoading, loadMore, needsUsername, refreshKey, user]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    if (authLoading || !user || needsUsername) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first?.isIntersecting) void loadMore(false);
+      },
+      { root: null, rootMargin: "200px", threshold: 0 },
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, needsUsername, user, hasMore]);
 
   if (authLoading || loading)
     return <div className="opacity-70 text-sm">Loading posts…</div>;
@@ -194,6 +247,13 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
           </div>
         </article>
       ))}
+
+      <div ref={sentinelRef} />
+      {loadingMore ? (
+        <div className="opacity-70 text-sm">Loading more…</div>
+      ) : !hasMore ? (
+        <div className="opacity-70 text-sm">No more posts.</div>
+      ) : null}
     </div>
   );
 };
