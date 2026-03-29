@@ -11,10 +11,12 @@ type AuthResult<T = unknown> =
 type AuthUser = Record<string, unknown> & {
   id?: string;
   name?: string;
+  username?: string;
   email?: string;
   role?: string;
   image?: string;
   avatar?: string;
+  bio?: string;
   createdAt?: string;
 };
 

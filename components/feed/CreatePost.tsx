@@ -9,6 +9,7 @@ import rehypeHighlight from "rehype-highlight";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { protectedApiRequest } from "@/lib/api";
+import InfoMsg from "@/components/utilities/Info";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
@@ -49,6 +50,9 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     content.length <= MAX_CHARS &&
     !submitting &&
     !uploading;
+
+  const username = String(user?.username ?? "").trim();
+  const needsUsername = Boolean(user) && !username;
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
 
   useEffect(() => {
@@ -167,6 +171,18 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
           <div className="text-sm">
             You need to <Link className="link" href="/login">log in</Link> to create a post.
           </div>
+        ) : needsUsername ? (
+          <InfoMsg
+            message={
+              <span className="text-sm">
+                You must complete your profile (set a{" "}
+                <Link className="link" href="/profile/edit">
+                  username
+                </Link>
+                ) to continue.
+              </span>
+            }
+          />
         ) : (
           <>
             {error ? <div className="alert alert-error py-2">{error}</div> : null}

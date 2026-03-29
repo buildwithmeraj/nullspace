@@ -6,6 +6,9 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
+import { useAuth } from "@/contexts/AuthContext";
+import Link from "next/link";
+import InfoMsg from "@/components/utilities/Info";
 
 const MarkdownPreview = dynamic(() => import("@uiw/react-markdown-preview"), {
   ssr: false,
@@ -26,6 +29,9 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { resolvedTheme } = useTheme();
+  const { user, loading: authLoading } = useAuth();
+  const username = String(user?.username ?? "").trim();
+  const needsUsername = Boolean(user) && !username;
 
   const previewOptions = useMemo(
     () => ({
@@ -38,6 +44,10 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   useEffect(() => {
     void (async () => {
       try {
+        if (authLoading) return;
+        if (!user) return;
+        if (needsUsername) return;
+
         // Fetch friends feed first, then append public posts (de-duplicated).
         const friendsRes = await protectedApiRequest<PostsResponse>({
           url: "/posts/friends",
@@ -62,9 +72,32 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
         setLoading(false);
       }
     })();
-  }, [refreshKey]);
+  }, [authLoading, needsUsername, refreshKey, user]);
 
-  if (loading) return <div className="opacity-70 text-sm">Loading posts…</div>;
+  if (authLoading || loading)
+    return <div className="opacity-70 text-sm">Loading posts…</div>;
+
+  if (!user)
+    return (
+      <div className="opacity-70 text-sm">
+        You need to <Link className="link" href="/login">log in</Link> to see posts.
+      </div>
+    );
+
+  if (needsUsername)
+    return (
+      <InfoMsg
+        message={
+          <span className="text-sm">
+            You must complete your profile (set a{" "}
+            <Link className="link" href="/profile/edit">
+              username
+            </Link>
+            ) to continue.
+          </span>
+        }
+      />
+    );
 
   if (!posts.length) return <div className="opacity-70 text-sm">No posts yet.</div>;
 
