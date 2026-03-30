@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import RequireLogin from "@/components/auth/RequireLogin";
 import ErrorMsg from "@/components/utilities/Error";
 import MarkdownContent from "@/components/markdown/MarkdownContent";
+import PostInteractions from "@/components/feed/PostInteractions";
 
 type PostImage = { url: string; publicId?: string; width?: number; height?: number };
 type PostAuthor = { _id: string; name?: string; username?: string; image?: string } | null;
@@ -149,6 +150,8 @@ export default function PostDetail({
               ))}
             </div>
           ) : null}
+
+          <PostInteractions postId={post._id} />
         </div>
       </article>
     </div>

@@ -2,17 +2,25 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { protectedApiRequest } from "@/lib/api";
-import { useTheme } from "next-themes";
 import { useAuth } from "@/contexts/AuthContext";
 import InfoMsg from "@/components/utilities/Info";
 import RequireLogin from "@/components/auth/RequireLogin";
 import Link from "next/link";
-import MarkdownContent from "@/components/markdown/MarkdownContent";
+import PostInteractions from "@/components/feed/PostInteractions";
+import { FaLongArrowAltRight } from "react-icons/fa";
 
-type PostImage = { url: string; publicId?: string; width?: number; height?: number };
-type PostAuthor =
-  | { _id: string; name?: string; username?: string; image?: string }
-  | null;
+type PostImage = {
+  url: string;
+  publicId?: string;
+  width?: number;
+  height?: number;
+};
+type PostAuthor = {
+  _id: string;
+  name?: string;
+  username?: string;
+  image?: string;
+} | null;
 type Post = {
   _id: string;
   content: string;
@@ -30,6 +38,41 @@ type FeedResponse = {
 
 const PAGE_SIZE = 15;
 
+function toPlainExcerpt(markdown: string, maxChars: number) {
+  const input = String(markdown ?? "");
+
+  // Remove fenced code blocks entirely (replace with a small placeholder).
+  let text = input
+    .replace(/```[\s\S]*?```/g, " [code block] ")
+    .replace(/~~~[\s\S]*?~~~/g, " [code block] ");
+
+  // Images: keep alt text if present.
+  text = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1");
+
+  // Links: keep the label only.
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+
+  // Inline code: drop backticks, keep content.
+  text = text.replace(/`([^`]+)`/g, "$1");
+
+  // Strip common markdown prefixes.
+  text = text
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "") // headings
+    .replace(/^\s{0,3}>\s?/gm, "") // blockquotes
+    .replace(/^\s{0,3}([-*+])\s+/gm, "") // unordered lists
+    .replace(/^\s{0,3}\d+\.\s+/gm, ""); // ordered lists
+
+  // Remove remaining markdown emphasis markers.
+  text = text.replace(/[*_~]/g, "");
+
+  // Collapse whitespace/newlines for a compact feed preview.
+  text = text.replace(/\s+/g, " ").trim();
+
+  if (!text) return "";
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+}
+
 const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   const [posts, setPosts] = useState<Post[]>([]);
   // "loading" is only for the initial page load. If the user is logged out we
@@ -37,54 +80,58 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const { resolvedTheme } = useTheme();
   const { user, loading: authLoading } = useAuth();
   const username = String(user?.username ?? "").trim();
   const needsUsername = Boolean(user) && !username;
   const fetchedIdsRef = useRef<Set<string>>(new Set());
   const initKeyRef = useRef<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const colorMode = resolvedTheme === "dark" ? "dark" : "light";
+  const EXCERPT_CHARS = 420;
 
-  const loadMore = useCallback(async (reset = false) => {
-    if (authLoading) return;
-    if (!user) return;
-    if (needsUsername) return;
-    if (!hasMore && !reset) return;
-    if (loadingMore) return;
+  const loadMore = useCallback(
+    async (reset = false) => {
+      if (authLoading) return;
+      if (!user) return;
+      if (needsUsername) return;
+      if (!hasMore && !reset) return;
+      if (loadingMore) return;
 
-    if (reset) setLoading(true);
-    setLoadingMore(true);
-    try {
-      if (reset) {
-        fetchedIdsRef.current = new Set();
-        setPosts([]);
-        setHasMore(true);
+      if (reset) setLoading(true);
+      setLoadingMore(true);
+      try {
+        if (reset) {
+          fetchedIdsRef.current = new Set();
+          setPosts([]);
+          setHasMore(true);
+        }
+
+        const excludeIds = Array.from(fetchedIdsRef.current);
+        const res = await protectedApiRequest<FeedResponse>({
+          url: "/posts/feed",
+          method: "POST",
+          data: { limit: PAGE_SIZE, excludeIds },
+        });
+
+        const nextPosts = res?.data?.posts ?? [];
+        const nextHasMore = Boolean(res?.data?.hasMore);
+
+        const unique = nextPosts.filter(
+          (p) => !fetchedIdsRef.current.has(p._id),
+        );
+        unique.forEach((p) => fetchedIdsRef.current.add(p._id));
+
+        setPosts((prev) => (reset ? unique : [...prev, ...unique]));
+        setHasMore(nextHasMore);
+      } catch (e) {
+        console.error("Failed to fetch feed:", e);
+        setHasMore(false);
+      } finally {
+        if (reset) setLoading(false);
+        setLoadingMore(false);
       }
-
-      const excludeIds = Array.from(fetchedIdsRef.current);
-      const res = await protectedApiRequest<FeedResponse>({
-        url: "/posts/feed",
-        method: "POST",
-        data: { limit: PAGE_SIZE, excludeIds },
-      });
-
-      const nextPosts = res?.data?.posts ?? [];
-      const nextHasMore = Boolean(res?.data?.hasMore);
-
-      const unique = nextPosts.filter((p) => !fetchedIdsRef.current.has(p._id));
-      unique.forEach((p) => fetchedIdsRef.current.add(p._id));
-
-      setPosts((prev) => (reset ? unique : [...prev, ...unique]));
-      setHasMore(nextHasMore);
-    } catch (e) {
-      console.error("Failed to fetch feed:", e);
-      setHasMore(false);
-    } finally {
-      if (reset) setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [authLoading, hasMore, loadingMore, needsUsername, user]);
+    },
+    [authLoading, hasMore, loadingMore, needsUsername, user],
+  );
 
   useEffect(() => {
     // Initial load should wait for auth to resolve; otherwise we may skip the
@@ -123,7 +170,12 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
     return <div className="opacity-70 text-sm">Loading posts…</div>;
 
   if (!user)
-    return <RequireLogin title="Feed" message={<span className="text-sm">Log in to see posts.</span>} />;
+    return (
+      <RequireLogin
+        title="Feed"
+        message={<span className="text-sm">Log in to see posts.</span>}
+      />
+    );
 
   if (needsUsername)
     return (
@@ -140,7 +192,8 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
       />
     );
 
-  if (!posts.length) return <div className="opacity-70 text-sm">No posts yet.</div>;
+  if (!posts.length)
+    return <div className="opacity-70 text-sm">No posts yet.</div>;
 
   return (
     <div className="space-y-4">
@@ -176,26 +229,46 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                     </span>
                   )}
                   {post.user?.username ? (
-                    <span className="opacity-70 block">@{post.user.username}</span>
+                    <span className="opacity-70 block">
+                      @{post.user.username}
+                    </span>
                   ) : null}
                 </div>
               </div>
               {post.createdAt ? (
                 <div className="text-xs opacity-60">
-                  {post.user?.username ? (
-                    <Link
-                      className="link link-hover"
-                      href={`/d/${encodeURIComponent(post.user.username)}/post/${encodeURIComponent(post._id)}`}
-                    >
-                      {new Date(post.createdAt).toLocaleString()}
-                    </Link>
-                  ) : (
-                    new Date(post.createdAt).toLocaleString()
-                  )}
+                  {new Date(post.createdAt).toLocaleString()}
                 </div>
               ) : null}
             </div>
-            <MarkdownContent source={post.content} colorMode={colorMode} />
+            {(() => {
+              const full = String(post.content ?? "");
+              const trimmed = full.trim();
+              const isLong = trimmed.length > EXCERPT_CHARS;
+              const preview = toPlainExcerpt(full, EXCERPT_CHARS);
+              const u = post.user?.username ? String(post.user.username) : "";
+              const href = u
+                ? `/d/${encodeURIComponent(u)}/post/${encodeURIComponent(post._id)}`
+                : `/d/unknown/post/${encodeURIComponent(post._id)}`;
+              return (
+                <div className="space-y-2">
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {preview}
+                  </p>
+                  <div className="flex items-center justify-center">
+                    <Link
+                      className="flex items-center gap-2 justify-center cursor-pointer opacity-50 hover:opacity-95 mt-3"
+                      href={href}
+                    >
+                      View full post <FaLongArrowAltRight />
+                    </Link>
+                    {isLong ? (
+                      <span className="text-xs opacity-60">(trimmed)</span>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })()}
             {post.images?.length ? (
               <div className="grid grid-cols-2 gap-2">
                 {post.images.slice(0, 5).map((img, idx) => (
@@ -209,6 +282,8 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                 ))}
               </div>
             ) : null}
+
+            <PostInteractions postId={post._id} />
           </div>
         </article>
       ))}

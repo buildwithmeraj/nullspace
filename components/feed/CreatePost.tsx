@@ -6,11 +6,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import axios from "axios";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { protectedApiRequest } from "@/lib/api";
 import InfoMsg from "@/components/utilities/Info";
 import RequireLogin from "@/components/auth/RequireLogin";
+import { Wand2 } from "lucide-react";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
@@ -27,7 +29,12 @@ type UploadResponse =
 const MAX_CHARS = 10_000;
 const MAX_IMAGES = 5;
 
-type MentionUser = { _id: string; name?: string; username: string; image?: string };
+type MentionUser = {
+  _id: string;
+  name?: string;
+  username: string;
+  image?: string;
+};
 type SearchUsersResponse = { success?: boolean; data?: MentionUser[] };
 
 function getMentionMatch(text: string, caret: number) {
@@ -45,7 +52,11 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const { resolvedTheme } = useTheme();
   const [content, setContent] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [mention, setMention] = useState<{ query: string; start: number; end: number } | null>(null);
+  const [mention, setMention] = useState<{
+    query: string;
+    start: number;
+    end: number;
+  } | null>(null);
   const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -53,31 +64,30 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const previewOptions = useMemo(
-    () => {
-      const highlight: [
-        typeof rehypeHighlight,
-        { detect: boolean; ignoreMissing: boolean },
-      ] = [rehypeHighlight, { detect: true, ignoreMissing: true }];
+  const previewOptions = useMemo(() => {
+    const highlight: [
+      typeof rehypeHighlight,
+      { detect: boolean; ignoreMissing: boolean },
+    ] = [rehypeHighlight, { detect: true, ignoreMissing: true }];
 
-      return {
-        remarkPlugins: [remarkGfm],
-        // `detect: true` highlights fenced blocks without an explicit language.
-        // `ignoreMissing: true` avoids runtime errors for unknown languages.
-        rehypePlugins: [highlight],
-      };
-    },
-    [],
-  );
+    return {
+      remarkPlugins: [remarkGfm],
+      // `detect: true` highlights fenced blocks without an explicit language.
+      // `ignoreMissing: true` avoids runtime errors for unknown languages.
+      rehypePlugins: [highlight],
+    };
+  }, []);
 
   const canSubmit =
     Boolean(content.trim()) &&
     content.length <= MAX_CHARS &&
     !submitting &&
-    !uploading;
+    !uploading &&
+    !enhancing;
 
   const username = String(user?.username ?? "").trim();
   const needsUsername = Boolean(user) && !username;
@@ -141,7 +151,10 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     const json = (await res.json().catch(() => null)) as UploadResponse | null;
     const url = json && "data" in json ? json.data?.url : undefined;
     if (!res.ok || !json?.success || !url) {
-      throw new Error((json && "message" in json ? json.message : undefined) ?? "Image upload failed");
+      throw new Error(
+        (json && "message" in json ? json.message : undefined) ??
+          "Image upload failed",
+      );
     }
     return url;
   };
@@ -166,8 +179,9 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     setSubmitting(true);
     try {
       setUploading(true);
-      const imageUrls =
-        imageFiles.length ? await Promise.all(imageFiles.map((f) => uploadOne(f))) : [];
+      const imageUrls = imageFiles.length
+        ? await Promise.all(imageFiles.map((f) => uploadOne(f)))
+        : [];
       setUploading(false);
 
       const res = await protectedApiRequest<CreatePostResult>({
@@ -196,13 +210,74 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     }
   };
 
+  const enhance = async () => {
+    setError(null);
+    setSuccess(null);
+
+    const raw = content.trim();
+    if (!raw) {
+      setError("Write something first");
+      return;
+    }
+
+    const prose = raw
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/~~~[\s\S]*?~~~/g, " ")
+      .replace(/`[^`]*`/g, " ");
+    const words = (prose.match(/[A-Za-z0-9_']+/g) ?? []).length;
+    if (words < 5) {
+      setError("Write at least one sentence (5+ words) to enhance.");
+      return;
+    }
+
+    setEnhancing(true);
+    try {
+      const json = await protectedApiRequest<{
+        success?: boolean;
+        message?: string;
+        data?: { content?: string };
+      }>({
+        url: "/ai/enhance",
+        method: "POST",
+        data: { content: raw },
+      });
+
+      if (!json?.success) {
+        setError(json?.message ?? "Failed to enhance post");
+        return;
+      }
+
+      const next = String(json.data?.content ?? "").trim();
+      if (!next) {
+        setError("Enhancer returned empty output");
+        return;
+      }
+      setContent(next);
+      setSuccess("Post enhanced");
+    } catch (e) {
+      if (axios.isAxiosError(e)) {
+        const data = e.response?.data as unknown;
+        const msg =
+          typeof (data as { message?: unknown } | null)?.message === "string"
+            ? String((data as { message: string }).message)
+            : e.message;
+        setError(msg || "Failed to enhance post");
+      } else {
+        setError(e instanceof Error ? e.message : "Failed to enhance post");
+      }
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
   const insertMention = (u: MentionUser) => {
     if (!mention) return;
     const label = `@${u.username}`;
     const href = `/d/${encodeURIComponent(u.username)}`;
     const md = `[${label}](${href}) `;
 
-    const next = content.slice(0, mention.start) + md + content.slice(mention.end);
+    const next =
+      content.slice(0, mention.start) + md + content.slice(mention.end);
     setContent(next);
     setMentionOpen(false);
     setMention(null);
@@ -231,7 +306,9 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     setMentionOpen(true);
   };
 
-  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleTextareaKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
     textareaRef.current = e.currentTarget;
     if (!mentionOpen) return;
     if (!mentionUsers.length) return;
@@ -273,9 +350,7 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
         ) : !user ? (
           <RequireLogin
             title="Create post"
-            message={
-              <span className="text-sm">Log in to create a post.</span>
-            }
+            message={<span className="text-sm">Log in to create a post.</span>}
           />
         ) : needsUsername ? (
           <InfoMsg
@@ -291,8 +366,12 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
           />
         ) : (
           <>
-            {error ? <div className="alert alert-error py-2">{error}</div> : null}
-            {success ? <div className="alert alert-success py-2">{success}</div> : null}
+            {error ? (
+              <div className="alert alert-error py-2">{error}</div>
+            ) : null}
+            {success ? (
+              <div className="alert alert-success py-2">{success}</div>
+            ) : null}
 
             <div data-color-mode={colorMode}>
               <MDEditor
@@ -339,7 +418,9 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
                               <div className="text-sm font-medium">
                                 {String(u.name ?? u.username)}
                               </div>
-                              <div className="text-xs opacity-70">@{u.username}</div>
+                              <div className="text-xs opacity-70">
+                                @{u.username}
+                              </div>
                             </div>
                           </div>
                         </button>
@@ -347,7 +428,9 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
                     ))}
                   </ul>
                 ) : (
-                  <div className="px-3 py-2 text-sm opacity-70">No users found.</div>
+                  <div className="px-3 py-2 text-sm opacity-70">
+                    No users found.
+                  </div>
                 )}
               </div>
             ) : null}
@@ -391,7 +474,21 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
             ) : null}
 
             <div className="card-actions justify-end">
-              <button className="btn btn-neutral" onClick={() => void submit()} disabled={!canSubmit}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => void enhance()}
+                disabled={submitting || uploading || enhancing}
+                title="Enhance (rewrite to be professional)"
+              >
+                <Wand2 size={16} />
+                {enhancing ? "Enhancing…" : "Enhance"}
+              </button>
+              <button
+                className="btn btn-neutral"
+                onClick={() => void submit()}
+                disabled={!canSubmit}
+              >
                 {uploading ? "Uploading…" : submitting ? "Posting…" : "Post"}
               </button>
             </div>
