@@ -73,8 +73,8 @@ api.interceptors.response.use(
       config._retry = true;
       const refreshUrl =
         typeof window === "undefined"
-          ? `${getApiBaseUrl()}/users/refresh`
-          : "/api/users/refresh";
+          ? `${getApiBaseUrl()}/auth/refresh-token`
+          : "/api/auth/refresh-token";
       try {
         const { data } = await axios.post<RefreshResponse>(
           refreshUrl,
@@ -116,8 +116,8 @@ type ProtectedRequestOptions = {
 async function tryRefreshAccessToken(): Promise<string | null> {
   const refreshUrl =
     typeof window === "undefined"
-      ? `${getApiBaseUrl()}/users/refresh`
-      : "/api/users/refresh";
+      ? `${getApiBaseUrl()}/auth/refresh-token`
+      : "/api/auth/refresh-token";
   try {
     const { data } = await axios.post<RefreshResponse>(
       refreshUrl,

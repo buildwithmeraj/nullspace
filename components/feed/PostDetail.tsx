@@ -13,11 +13,13 @@ import MarkdownContent from "@/components/markdown/MarkdownContent";
 import PostInteractions from "@/components/feed/PostInteractions";
 import LoaderBlock from "@/components/utilities/LoaderBlock";
 import Loader from "@/components/utilities/Loader";
+import PostOwnerActions from "@/components/feed/PostOwnerActions";
 
 type PostImage = { url: string; publicId?: string; width?: number; height?: number };
 type PostAuthor = { _id: string; name?: string; username?: string; image?: string } | null;
 type Post = {
   _id: string;
+  userId?: string;
   content: string;
   images?: PostImage[];
   createdAt?: string;
@@ -91,6 +93,11 @@ export default function PostDetail({
 
   const authorUsername = String(post.user?.username ?? "").trim();
   const authorName = String(post.user?.name ?? authorUsername ?? "Unknown");
+  const meId = String(user.id ?? user._id ?? "").trim();
+  const canManage =
+    Boolean(meId) &&
+    (String(post.userId ?? "").trim() === meId ||
+      String(user.role ?? "") === "admin");
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-6 space-y-4">
@@ -130,11 +137,25 @@ export default function PostDetail({
               </div>
             </div>
 
-            {post.createdAt ? (
-              <div className="text-xs opacity-60">
-                {new Date(post.createdAt).toLocaleString()}
-              </div>
-            ) : null}
+            <div className="flex items-start gap-2">
+              {post.createdAt ? (
+                <div className="text-xs opacity-60">
+                  {new Date(post.createdAt).toLocaleString()}
+                </div>
+              ) : null}
+              {canManage ? (
+                <PostOwnerActions
+                  postId={post._id}
+                  content={post.content}
+                  onUpdated={({ content }) =>
+                    setPost((prev) => (prev ? { ...prev, content } : prev))
+                  }
+                  onDeleted={() => {
+                    router.replace("/");
+                  }}
+                />
+              ) : null}
+            </div>
           </div>
 
           <MarkdownContent source={post.content} colorMode={colorMode} />

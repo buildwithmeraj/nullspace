@@ -131,7 +131,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const googlePath =
       process.env.NEXT_PUBLIC_GOOGLE_AUTH_PATH ?? "/users/google";
     const isAbsoluteUrl = /^https?:\/\//i.test(googlePath);
-    window.location.assign(isAbsoluteUrl ? googlePath : toProxyUrl(googlePath));
+    if (isAbsoluteUrl) {
+      window.location.assign(googlePath);
+      return;
+    }
+
+    const apiBase = getApiBaseUrl();
+    // For OAuth redirects, prefer navigating directly to the backend (avoids
+    // Next proxy/rewrite edge-cases with 302 Location headers).
+    if (apiBase) {
+      const normalized = googlePath.startsWith("/") ? googlePath : `/${googlePath}`;
+      window.location.assign(`${apiBase}${normalized}`);
+      return;
+    }
+
+    window.location.assign(toProxyUrl(googlePath));
   };
 
 	  const authRequest = async (path: string, init?: RequestInit) => {
@@ -168,7 +182,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const silentRefresh = async (): Promise<boolean> => {
     // Hydrates the session on page load (and rotates tokens on the backend).
-    const res = await authRequest("/users/refresh", { method: "POST" });
+    const res = await authRequest("/auth/refresh-token", { method: "POST" });
     if (!res) return false;
     if (!res.ok) {
       // Refresh cookie is missing/invalid → treat as logged out and clear caches.
@@ -209,7 +223,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (input: LoginInput): Promise<AuthResult> => {
     setLoading(true);
     try {
-      const res = await authRequest("/users/login", {
+      const res = await authRequest("/auth/login", {
         method: "POST",
         body: JSON.stringify(input),
       });
@@ -241,7 +255,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const register = async (input: RegisterInput): Promise<AuthResult> => {
     setLoading(true);
     try {
-      const res = await authRequest("/users/register", {
+      const res = await authRequest("/auth/register", {
         method: "POST",
         body: JSON.stringify(input),
       });

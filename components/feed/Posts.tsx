@@ -9,6 +9,7 @@ import Link from "next/link";
 import PostInteractions from "@/components/feed/PostInteractions";
 import { FaLongArrowAltRight } from "react-icons/fa";
 import Loader from "../utilities/Loader";
+import PostOwnerActions from "@/components/feed/PostOwnerActions";
 
 type PostImage = {
   url: string;
@@ -117,6 +118,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const { user, loading: authLoading } = useAuth();
+  const meId = String(user?.id ?? user?._id ?? "").trim();
   const username = String(user?.username ?? "").trim();
   const needsUsername = Boolean(user) && !username;
   const fetchedIdsRef = useRef<Set<string>>(new Set());
@@ -274,11 +276,27 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                   ) : null}
                 </div>
               </div>
-              {post.createdAt ? (
-                <div className="text-xs opacity-60">
-                  {new Date(post.createdAt).toLocaleString()}
-                </div>
-              ) : null}
+              <div className="flex items-start gap-2">
+                {post.createdAt ? (
+                  <div className="text-xs opacity-60">
+                    {new Date(post.createdAt).toLocaleString()}
+                  </div>
+                ) : null}
+                {meId && String(post.userId ?? "") === meId ? (
+                  <PostOwnerActions
+                    postId={post._id}
+                    content={post.content}
+                    onUpdated={({ content }) =>
+                      setPosts((prev) =>
+                        prev.map((p) => (p._id === post._id ? { ...p, content } : p)),
+                      )
+                    }
+                    onDeleted={() =>
+                      setPosts((prev) => prev.filter((p) => p._id !== post._id))
+                    }
+                  />
+                ) : null}
+              </div>
             </div>
             {(() => {
               const full = String(post.content ?? "");

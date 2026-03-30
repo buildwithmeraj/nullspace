@@ -17,7 +17,8 @@ export const metadata: Metadata = {
     default: "NullSpace",
     template: "%s | NullSpace",
   },
-  description: "A developer-focused social space for sharing posts, code, and ideas.",
+  description:
+    "A developer-focused social space for sharing posts, code, and ideas.",
 };
 
 export default function RootLayout({
@@ -34,8 +35,7 @@ export default function RootLayout({
           <header>
             <Navbar />
           </header>
-          {/* Offset fixed navbar height (daisyUI navbar is ~4rem). */}
-          <main className="grow pt-16 mx-auto w-full max-w-6xl px-3 sm:px-4 py-6">
+          <main className="grow pt-16 mx-auto w-full max-w-6xl px-3 sm:px-4 py-6 mt-3">
             {children}
           </main>
           <Footer />

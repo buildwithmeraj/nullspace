@@ -3,16 +3,58 @@
 import Link from "next/link";
 import React from "react";
 import { useNotifications } from "@/contexts/NotificationsContext";
+import type {
+  NotificationItem,
+  NotificationType,
+} from "@/contexts/NotificationsContext";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Heart,
+  MessageCircle,
+  UserPlus,
+} from "lucide-react";
 
 export default function NotificationsBell() {
   const { notifications, unread, markRead, markAllRead } = useNotifications();
 
-  const getHref = (n: (typeof notifications)[number]) => {
+  const getHref = (n: NotificationItem) => {
     const fromUsername = String(n.data?.fromUsername ?? "").trim();
-    if (fromUsername) return `/d/${encodeURIComponent(fromUsername)}`;
     const postId = String(n.data?.postId ?? "").trim();
-    if (postId) return "/";
+    const postOwnerUsername = String(n.data?.postOwnerUsername ?? "").trim();
+
+    if (postId && postOwnerUsername) {
+      return `/d/${encodeURIComponent(postOwnerUsername)}/post/${encodeURIComponent(postId)}`;
+    }
+    if (postId && fromUsername) {
+      return `/d/${encodeURIComponent(fromUsername)}/post/${encodeURIComponent(postId)}`;
+    }
+    if (fromUsername) return `/d/${encodeURIComponent(fromUsername)}`;
     return null;
+  };
+
+  const getIcon = (type: NotificationType) => {
+    switch (type) {
+      case "alliance_request":
+        return <UserPlus className="text-primary" />;
+      case "alliance_accepted":
+        return <CheckCircle2 className="text-success" />;
+      case "comment":
+        return <MessageCircle className="text-secondary" />;
+      case "reaction":
+        return <Heart className="text-error" />;
+      case "profile_incomplete":
+      default:
+        return <AlertCircle className="text-warning" />;
+    }
+  };
+
+  const formatTime = (n: NotificationItem) => {
+    const raw = n.createdAt;
+    if (!raw) return "";
+    const d = raw instanceof Date ? raw : new Date(raw);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleString();
   };
 
   return (
@@ -45,8 +87,8 @@ export default function NotificationsBell() {
         </div>
       </button>
 
-      <div className="dropdown-content z-[1] mt-3 w-80 rounded-box border border-base-200 bg-base-100 shadow">
-        <div className="p-3 flex items-center justify-between gap-2">
+      <div className="dropdown-content z-[1] mt-3 w-96 max-w-[90vw] border border-base-200 bg-base-100 shadow">
+        <div className="px-4 py-3 flex items-center justify-between gap-2 border-b border-base-200">
           <div className="font-semibold">Notifications</div>
           <button
             type="button"
@@ -60,39 +102,80 @@ export default function NotificationsBell() {
 
         <div className="max-h-96 overflow-auto">
           {!notifications.length ? (
-            <div className="p-3 text-sm opacity-70">No notifications yet.</div>
+            <div className="px-4 py-6 text-sm opacity-70">
+              No notifications yet.
+            </div>
           ) : (
-            <ul className="menu menu-sm">
+            <div className="divide-y divide-base-200">
               {notifications.slice(0, 20).map((n) => {
                 const href = getHref(n);
+                const ts = formatTime(n);
+                const icon = getIcon(n.type);
+                const unreadDot = !n.read;
+                const itemClass =
+                  "w-full text-left px-4 py-3 transition-colors rounded-none flex items-center";
                 return (
-                  <li key={n._id}>
-                    <div
-                      className={`flex items-start justify-between gap-2 ${n.read ? "opacity-70" : ""}`}
-                    >
-                      {href ? (
-                        <Link
-                          className="text-sm flex-1 border-t pt-2 hover:bg-none"
-                          href={href}
-                          onClick={() => void markRead(n._id)}
-                        >
-                          {n.message}
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          className="text-left text-sm flex-1"
-                          onClick={() => void markRead(n._id)}
-                        >
-                          {n.message}
-                        </button>
-                      )}
-                    </div>
-                  </li>
+                  <div key={n._id} className={n.read ? "opacity-70" : ""}>
+                    {href ? (
+                      <Link
+                        href={href}
+                        onClick={() => void markRead(n._id)}
+                        className={itemClass}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 shrink-0">{icon}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="text-sm leading-snug break-words">
+                                {n.message}
+                              </div>
+                              {unreadDot ? (
+                                <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                              ) : null}
+                            </div>
+                            {ts ? (
+                              <div className="text-xs opacity-60 mt-1">
+                                {ts}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void markRead(n._id)}
+                        className={itemClass}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 shrink-0">{icon}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="text-sm leading-snug break-words">
+                                {n.message}
+                              </div>
+                              {unreadDot ? (
+                                <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                              ) : null}
+                            </div>
+                            {ts ? (
+                              <div className="text-xs opacity-60 mt-1">
+                                {ts}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    )}
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           )}
+        </div>
+
+        <div className="px-4 py-2 border-t border-base-200 text-xs opacity-40 text-center">
+          Showing latest {Math.min(20, notifications.length)} notifications
         </div>
       </div>
     </div>

@@ -26,6 +26,7 @@ export default function UpdateProfile() {
   const params = useSearchParams();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const initial = useMemo<FormState>(
     () => ({
@@ -74,6 +75,15 @@ export default function UpdateProfile() {
   const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     setForm((prev) => ({ ...prev, imageFile: file }));
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -118,6 +128,10 @@ export default function UpdateProfile() {
       }
 
       setForm((prev) => ({ ...prev, imageFile: null }));
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       toast.success(res.message ?? "Profile updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update profile");
@@ -126,6 +140,15 @@ export default function UpdateProfile() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
 
   if (loading) return null;
   if (!user)
@@ -163,6 +186,27 @@ export default function UpdateProfile() {
         ) : null}
 
         <form className="space-y-3" onSubmit={submit}>
+          <div className="flex items-center gap-3">
+            <div className="avatar">
+              <div className="w-12 rounded-full bg-base-200">
+                {previewUrl || user.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl ?? String(user.image ?? "")}
+                    alt="Profile"
+                    className="object-cover"
+                  />
+                ) : null}
+              </div>
+            </div>
+            <div className="text-sm">
+              <div className="font-medium">Profile picture</div>
+              <div className="opacity-70">
+                Upload a square image for best results.
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="form-control w-full">
               <div className="label">

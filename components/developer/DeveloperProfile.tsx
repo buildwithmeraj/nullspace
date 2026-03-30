@@ -9,6 +9,8 @@ import SuccessMsg from "@/components/utilities/Success";
 import RequireLogin from "@/components/auth/RequireLogin";
 import Loader from "@/components/utilities/Loader";
 import LoaderBlock from "@/components/utilities/LoaderBlock";
+import { FaLongArrowAltRight } from "react-icons/fa";
+import PostOwnerActions from "@/components/feed/PostOwnerActions";
 
 type PublicUser = {
   _id: string;
@@ -30,6 +32,42 @@ type Friend = {
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T };
 
+type PostImage = {
+  url: string;
+  publicId?: string;
+  width?: number;
+  height?: number;
+};
+type Post = {
+  _id: string;
+  content: string;
+  images?: PostImage[];
+  createdAt?: string;
+  userId?: string;
+  user?: PublicUser | null;
+};
+type PostsResponse = { success?: boolean; message?: string; data?: Post[] };
+
+function toPlainExcerpt(markdown: string, maxChars: number) {
+  const input = String(markdown ?? "");
+  let text = input
+    .replace(/```[\s\S]*?```/g, " [code block] ")
+    .replace(/~~~[\s\S]*?~~~/g, " [code block] ");
+  text = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1");
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  text = text.replace(/`([^`]+)`/g, "$1");
+  text = text
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s{0,3}>\s?/gm, "")
+    .replace(/^\s{0,3}([-*+])\s+/gm, "")
+    .replace(/^\s{0,3}\d+\.\s+/gm, "");
+  text = text.replace(/[*_~]/g, "");
+  text = text.replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
+}
+
 export default function DeveloperProfile({ username }: { username: string }) {
   const { user, loading } = useAuth();
   const [dev, setDev] = useState<PublicUser | null>(null);
@@ -37,6 +75,8 @@ export default function DeveloperProfile({ username }: { username: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
 
   const meId = useMemo(() => {
     if (!user) return null;
@@ -75,6 +115,7 @@ export default function DeveloperProfile({ username }: { username: string }) {
     setInfo(null);
     setDev(null);
     setRelationship(null);
+    setPosts([]);
 
     (async () => {
       if (loading) return;
@@ -92,6 +133,15 @@ export default function DeveloperProfile({ username }: { username: string }) {
         if (cancelled) return;
         setDev(nextDev);
         setRelationship(nextRel);
+
+        // Load the developer's posts (public in-app, but still auth-protected).
+        setPostsLoading(true);
+        const postsRes = await protectedApiRequest<PostsResponse>({
+          url: `/posts/user/${encodeURIComponent(String(nextDev._id))}`,
+          method: "GET",
+        }).catch(() => null);
+        if (!cancelled) setPosts(postsRes?.data ?? []);
+        if (!cancelled) setPostsLoading(false);
       } catch (e) {
         if (!cancelled)
           setError(e instanceof Error ? e.message : "Failed to load profile");
@@ -178,14 +228,13 @@ export default function DeveloperProfile({ username }: { username: string }) {
       <RequireLogin
         title="Developer profile"
         message={
-          <span className="text-sm">
-            Log in to view developer profiles.
-          </span>
+          <span className="text-sm">Log in to view developer profiles.</span>
         }
       />
     );
 
-  if (error) return <ErrorMsg message={<span className="text-sm">{error}</span>} />;
+  if (error)
+    return <ErrorMsg message={<span className="text-sm">{error}</span>} />;
   if (!dev) return <LoaderBlock />;
 
   const isMe =
@@ -193,6 +242,11 @@ export default function DeveloperProfile({ username }: { username: string }) {
     String(dev.username ?? "").trim() === String(user.username ?? "").trim();
 
   const displayImage = String(dev.image ?? "").trim();
+  const displayName =
+    String(dev.name ?? "").trim() || `@${String(dev.username ?? "").trim()}`;
+  const displayUsername = String(dev.username ?? "").trim();
+  const displayBio = String(dev.bio ?? "").trim();
+  const memberSince = String(dev.createdAt ?? "").trim();
   const relStatus = relationship?.status;
   const isIncomingPending =
     relStatus === "pending" &&
@@ -201,66 +255,172 @@ export default function DeveloperProfile({ username }: { username: string }) {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-3 sm:px-4 py-6 space-y-4">
-      {info ? <SuccessMsg message={<span className="text-sm">{info}</span>} /> : null}
+      {info ? (
+        <SuccessMsg message={<span className="text-sm">{info}</span>} />
+      ) : null}
 
-      <section className="card bg-base-100 border border-base-200 shadow-sm">
-        <div className="card-body">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              {displayImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={displayImage}
-                  alt="Developer"
-                  className="w-16 h-16 rounded-md object-cover"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-md bg-base-200" />
-              )}
-              <div>
-                <h1 className="text-lg font-semibold">{String(dev.name ?? "")}</h1>
-                <div className="text-sm opacity-70">@{String(dev.username ?? "")}</div>
-                {dev.bio ? <p className="text-sm mt-2">{String(dev.bio)}</p> : null}
+      <section className="overflow-hidden w-xl mx-auto">
+        <div className="h-20" />
+        <div className="card-body pt-0 -mt-10 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="flex items-end gap-4">
+              <div className="avatar">
+                <div className="w-20 rounded-full ring ring-base-100 ring-offset-2 ring-offset-base-100 bg-base-200">
+                  {displayImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={displayImage}
+                      alt="Developer"
+                      className="object-cover"
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold truncate">
+                  {displayName}
+                </h1>
+                {displayUsername ? (
+                  <div className="text-sm opacity-70 truncate">
+                    @{displayUsername}
+                  </div>
+                ) : null}
+                {displayBio ? (
+                  <p className="text-sm mt-2 opacity-90 break-words">
+                    {displayBio}
+                  </p>
+                ) : null}
+                <div className="pt-2 flex flex-wrap items-center gap-2">
+                  {memberSince ? (
+                    <span className="badge badge-ghost">
+                      Member since {new Date(memberSince).toLocaleDateString()}
+                    </span>
+                  ) : null}
+                  {posts.length ? (
+                    <span className="badge badge-outline">
+                      {posts.length} posts
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
 
-            {isMe ? (
-              <Link className="btn btn-sm btn-outline" href="/profile">
-                My profile
-              </Link>
-            ) : relationship?.status === "accepted" ? (
-              <div className="badge badge-success badge-outline">Alliance</div>
-            ) : isIncomingPending ? (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {isMe ? (
+                <Link className="btn btn-sm btn-outline" href="/profile">
+                  My profile
+                </Link>
+              ) : relationship?.status === "accepted" ? (
+                <div className="badge badge-success badge-outline">
+                  Alliance
+                </div>
+              ) : isIncomingPending ? (
+                <>
+                  <button
+                    className="btn btn-sm btn-success"
+                    onClick={() => void acceptRequest()}
+                    disabled={busy}
+                  >
+                    {busy ? "Working…" : "Accept"}
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => void rejectRequest()}
+                    disabled={busy}
+                  >
+                    Reject
+                  </button>
+                </>
+              ) : relationship?.status === "pending" ? (
+                <div className="badge badge-warning badge-outline">
+                  Request pending
+                </div>
+              ) : (
                 <button
-                  className="btn btn-sm btn-success"
-                  onClick={() => void acceptRequest()}
+                  className="btn btn-sm btn-primary"
+                  onClick={() => void sendRequest()}
                   disabled={busy}
                 >
-                  {busy ? "Working…" : "Accept"}
+                  {busy ? "Sending…" : "Send alliance request"}
                 </button>
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => void rejectRequest()}
-                  disabled={busy}
-                >
-                  Reject
-                </button>
-              </div>
-            ) : relationship?.status === "pending" ? (
-              <div className="badge badge-warning badge-outline">
-                Request pending
-              </div>
-            ) : (
-              <button
-                className="btn btn-sm btn-neutral"
-                onClick={() => void sendRequest()}
-                disabled={busy}
-              >
-                {busy ? "Sending…" : "Send alliance request"}
-              </button>
-            )}
+              )}
+            </div>
           </div>
+        </div>
+      </section>
+
+      <section className="card bg-base-100 border border-base-200 shadow-sm">
+        <div className="card-body space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="card-title text-base">Posts</h2>
+            <div className="text-xs opacity-60">
+              {posts.length ? `${posts.length} total` : null}
+            </div>
+          </div>
+
+          {postsLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 2 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-md border border-base-200 p-3"
+                >
+                  <div className="space-y-2">
+                    <div className="skeleton h-3 w-full" />
+                    <div className="skeleton h-3 w-5/6" />
+                    <div className="skeleton h-3 w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : posts.length ? (
+            <div className="space-y-3">
+            {posts.slice(0, 10).map((p) => {
+              const uname = String(dev.username ?? "").trim();
+              const href = uname
+                ? `/d/${encodeURIComponent(uname)}/post/${encodeURIComponent(p._id)}`
+                : `/d/unknown/post/${encodeURIComponent(p._id)}`;
+              return (
+                <div
+                  key={p._id}
+                  className="rounded-md border border-base-200 p-3 hover:bg-base-200/40 transition-colors"
+                >
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {toPlainExcerpt(p.content, 420)}
+                  </p>
+                  <div className="pt-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Link className="btn btn-xs btn-ghost gap-2" href={href}>
+                        View full post <FaLongArrowAltRight />
+                      </Link>
+                      {isMe ? (
+                        <PostOwnerActions
+                          postId={p._id}
+                          content={p.content}
+                          onUpdated={({ content }) =>
+                            setPosts((prev) =>
+                              prev.map((x) => (x._id === p._id ? { ...x, content } : x)),
+                            )
+                          }
+                          onDeleted={() =>
+                            setPosts((prev) => prev.filter((x) => x._id !== p._id))
+                          }
+                        />
+                      ) : null}
+                    </div>
+                    {p.createdAt ? (
+                      <span className="text-xs opacity-60">
+                        {new Date(p.createdAt).toLocaleDateString()}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+            </div>
+          ) : (
+            <div className="text-sm opacity-70">No posts yet.</div>
+          )}
         </div>
       </section>
     </div>
