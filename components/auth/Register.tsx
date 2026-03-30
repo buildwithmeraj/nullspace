@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ interface FormData {
 }
 
 const Register = () => {
-  const { register, loading, startGoogleLogin } = useAuth();
+  const { register, loading, startGoogleLogin, user } = useAuth();
   const router = useRouter();
   // Manage form state
   const [formData, setFormData] = useState<FormData>({
@@ -25,6 +25,13 @@ const Register = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    // If already logged in (e.g., Google), don't keep user on register screen.
+    if (loading) return;
+    if (!user) return;
+    router.replace("/profile");
+  }, [loading, router, user]);
 
   // A generic change handler for multiple inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

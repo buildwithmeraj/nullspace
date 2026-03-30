@@ -2,8 +2,9 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import InfoMsg from "@/components/utilities/Info";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Props = {
   title?: string;
@@ -16,7 +17,9 @@ export default function RequireLogin({
   message,
   nextPath,
 }: Props) {
+  const { user, loading } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const next = nextPath ?? pathname ?? "/";
 
   useEffect(() => {
@@ -26,6 +29,13 @@ export default function RequireLogin({
       // ignore
     }
   }, [next]);
+
+  useEffect(() => {
+    // If auth resolves after this placeholder rendered, navigate back automatically.
+    if (loading) return;
+    if (!user) return;
+    router.replace(next);
+  }, [loading, next, router, user]);
 
   return (
     <section className="card bg-base-100 shadow">
