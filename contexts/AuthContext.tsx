@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 // Frontend auth state is a lightweight cache. The backend owns the real session via an httpOnly `refreshToken` cookie; we optionally cache a short-lived access token in `sessionStorage` for convenience.
@@ -54,6 +60,42 @@ function toProxyUrl(path: string) {
   // Same-origin proxy route. `next.config.ts` rewrites `/api/*` → `${NEXT_PUBLIC_API_URL}/*`.
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return `/api${normalized}`;
+}
+
+async function authRequest(path: string, init?: RequestInit) {
+  const base = getApiBaseUrl();
+  // Always include cookies so the backend can read/rotate the refreshToken cookie.
+  // In production (Vercel ↔ Render), the refresh cookie lives on the backend domain,
+  // so we must call the backend directly (not via Next `/api` rewrites).
+  const url =
+    base && typeof window !== "undefined"
+      ? `${base}${path}`
+      : typeof window === "undefined"
+        ? base
+          ? `${base}${path}`
+          : toProxyUrl(path)
+        : toProxyUrl(path);
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const controller = init?.signal ? null : new AbortController();
+  try {
+    const timeoutMs = 12_000;
+    timeoutId =
+      controller != null ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+    return await fetch(url, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      credentials: "include",
+      signal: init?.signal ?? controller?.signal,
+    });
+  } catch {
+    return null;
+  } finally {
+    if (timeoutId != null) clearTimeout(timeoutId);
+  }
 }
 
 async function safeJson(res: Response) {
@@ -149,46 +191,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     window.location.assign(toProxyUrl(googlePath));
   };
 
-	  const authRequest = async (path: string, init?: RequestInit) => {
-	    const base = getApiBaseUrl();
-	    // Always include cookies so the backend can read/rotate the refreshToken cookie.
-	    // In production (Vercel ↔ Render), the refresh cookie lives on the backend domain,
-	    // so we must call the backend directly (not via Next `/api` rewrites).
-	    const url =
-	      base && typeof window !== "undefined"
-	        ? `${base}${path}`
-	        : typeof window === "undefined"
-	          ? base
-	            ? `${base}${path}`
-	            : toProxyUrl(path)
-	          : toProxyUrl(path);
-	    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-	    const controller = init?.signal ? null : new AbortController();
-	    try {
-	      const timeoutMs = 12_000;
-	      timeoutId =
-	        controller != null ? setTimeout(() => controller.abort(), timeoutMs) : null;
-
-	      return await fetch(url, {
-	        ...init,
-	        headers: {
-	          "Content-Type": "application/json",
-	          ...(init?.headers ?? {}),
-	        },
-	        credentials: "include",
-	        signal: init?.signal ?? controller?.signal,
-	      });
-	    } catch {
-	      return null;
-	    } finally {
-	      if (timeoutId != null) clearTimeout(timeoutId);
-	    }
-	  };
-
-  const hydrateMe = async (tokenOverride?: string | null): Promise<boolean> => {
+  const hydrateMe = useCallback(async (tokenOverride?: string | null) => {
     const token =
       tokenOverride ??
-      accessToken ??
       (typeof window !== "undefined"
         ? sessionStorage.getItem("accessToken")
         : null);
@@ -217,9 +222,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { user: nextUser } = pickAuthPayload(json);
     if (nextUser) setUser(nextUser);
     return Boolean(nextUser);
-  };
+  }, []);
 
-  const silentRefresh = async (): Promise<boolean> => {
+  const silentRefresh = useCallback(async (): Promise<boolean> => {
     // Hydrates the session on page load (and rotates tokens on the backend).
     const res = await authRequest("/auth/refresh-token", { method: "POST" });
     if (!res) return false;
@@ -228,9 +233,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // (OAuth redirect, or third‑party cookies blocked), keep it and let token-based
       // auth continue working.
       const hasCachedToken =
-        Boolean(accessToken) ||
-        (typeof window !== "undefined" &&
-          Boolean(sessionStorage.getItem("accessToken")));
+        typeof window !== "undefined" &&
+        Boolean(sessionStorage.getItem("accessToken"));
       if (!hasCachedToken) {
         setUser(null);
         setAccessToken(null);
@@ -247,31 +251,76 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     if (nextUser) setUser(nextUser);
     return Boolean(nextUser);
-  };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
-        // Fast path: show "logged in" UI immediately if we have a cached token.
+        // Fast path: cache token immediately if we have one (OAuth redirect, previous session).
         const storedToken = sessionStorage.getItem("accessToken");
-        if (storedToken) {
-          setAccessToken(storedToken);
-          await hydrateMe(storedToken);
-          // Best-effort: rotate tokens via refresh cookie (may be blocked cross-site).
-          void silentRefresh();
-        } else {
-          await silentRefresh();
+        if (storedToken) setAccessToken(storedToken);
+
+        // Prefer refresh-cookie session if available (rotates tokens on the backend).
+        const refreshed = await silentRefresh();
+        if (cancelled) return;
+
+        if (refreshed) {
+          setLoading(false);
+          return;
         }
-      } finally {
+
+        // If we have a cached token but refresh-cookie failed (third‑party cookies blocked),
+        // keep `loading` true until `/users/me` hydration succeeds (handled by the effect below).
+        const hasToken = Boolean(sessionStorage.getItem("accessToken"));
+        if (!hasToken) setLoading(false);
+      } catch {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [silentRefresh]);
+
+  useEffect(() => {
+    // If we have an access token but no user yet, hydrate `/users/me` with retries.
+    // This covers OAuth redirects + backend cold starts (Render) without trapping the user on `/auth/callback`.
+    if (!accessToken || user) return;
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const run = async () => {
+      if (cancelled) return;
+      setLoading(true);
+
+      const ok = await hydrateMe(accessToken);
+      if (cancelled) return;
+      if (ok) {
+        setLoading(false);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts >= 3) {
+        setLoading(false);
+        return;
+      }
+
+      // Simple backoff between attempts.
+      const delayMs = 1200 * attempts;
+      retryTimer = setTimeout(() => void run(), delayMs);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [accessToken, hydrateMe, user]);
 
   const login = async (input: LoginInput): Promise<AuthResult> => {
     setLoading(true);
