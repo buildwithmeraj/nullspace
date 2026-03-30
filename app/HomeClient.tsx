@@ -26,11 +26,11 @@ export default function HomeClient() {
       <aside className="hidden md:block md:col-span-4 lg:col-span-3">
         <div className="sticky top-20 space-y-4">
           <section className="card bg-base-100 border border-base-200 shadow-sm transition-shadow hover:shadow-md overflow-hidden">
-            <div className="h-14 bg-gradient-to-r from-primary/15 via-secondary/10 to-accent/15" />
+            <div className="h-14" />
             <div className="card-body pt-0 -mt-7 space-y-3">
-              <div className="flex items-end gap-3">
+              <div className="flex items-center gap-3">
                 <div className="avatar">
-                  <div className="w-14 rounded-full ring ring-base-100 ring-offset-2 ring-offset-base-100 bg-base-200">
+                  <div className="w-14 rounded-full ring ring-base-100 ring-offset-2 ring-offset-base-100 bg-base-300">
                     {image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={image} alt="Profile" className="object-cover" />
@@ -82,11 +82,17 @@ export default function HomeClient() {
               <h2 className="card-title text-base">Shortcuts</h2>
               <div className="space-y-2">
                 {!user ? (
-                  <Link className="btn btn-sm btn-outline w-full" href="/login?next=/">
+                  <Link
+                    className="btn btn-sm btn-outline w-full"
+                    href="/login?next=/"
+                  >
                     Create post
                   </Link>
                 ) : needsUsername ? (
-                  <Link className="btn btn-sm btn-outline w-full" href="/profile/edit?reason=complete_profile&next=%2F">
+                  <Link
+                    className="btn btn-sm btn-outline w-full"
+                    href="/profile/edit?reason=complete_profile&next=%2F"
+                  >
                     Create post
                   </Link>
                 ) : (
@@ -150,16 +156,6 @@ export default function HomeClient() {
 
       <aside className="hidden lg:block lg:col-span-3">
         <div className="sticky top-20 space-y-4">
-          <section className="card bg-base-100 border border-base-200 shadow-sm transition-shadow hover:shadow-md">
-            <div className="card-body">
-              <h2 className="card-title text-base">Trending</h2>
-              <ul className="text-sm opacity-80 space-y-1">
-                <li>#typescript</li>
-                <li>#nextjs</li>
-                <li>#mongodb</li>
-              </ul>
-            </div>
-          </section>
           <SuggestedUsers limit={10} />
         </div>
       </aside>

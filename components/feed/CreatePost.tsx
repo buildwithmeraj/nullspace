@@ -143,7 +143,11 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     // Backend expects single file field named `image`.
     body.append("image", file);
 
-    const res = await fetch("/api/cloudinary/upload", {
+    const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ?? "";
+    const uploadUrl = base
+      ? `${base}/cloudinary/upload`
+      : "/api/cloudinary/upload";
+    const res = await fetch(uploadUrl, {
       method: "POST",
       body,
       credentials: "include",

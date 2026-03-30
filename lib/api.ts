@@ -39,8 +39,9 @@ function clearClientAccessToken() {
 }
 
 export const api = axios.create({
-  // Browser → same-origin proxy (`/api/*`). Server → direct backend base URL.
-  baseURL: typeof window === "undefined" ? getApiBaseUrl() : "/api",
+  // Prefer direct backend base URL (supports cross-site cookies on Vercel/Render).
+  // Fallback to same-origin proxy only when the env var is missing.
+  baseURL: getApiBaseUrl() || "/api",
   withCredentials: true,
   // Prevent UI hangs when the backend is unreachable.
   timeout: 12_000,
@@ -72,9 +73,7 @@ api.interceptors.response.use(
       // One-time token refresh + retry. Backend must read httpOnly refresh cookie.
       config._retry = true;
       const refreshUrl =
-        typeof window === "undefined"
-          ? `${getApiBaseUrl()}/auth/refresh-token`
-          : "/api/auth/refresh-token";
+        `${getApiBaseUrl() || "/api"}/auth/refresh-token`;
       try {
         const { data } = await axios.post<RefreshResponse>(
           refreshUrl,
@@ -114,10 +113,7 @@ type ProtectedRequestOptions = {
 };
 
 async function tryRefreshAccessToken(): Promise<string | null> {
-  const refreshUrl =
-    typeof window === "undefined"
-      ? `${getApiBaseUrl()}/auth/refresh-token`
-      : "/api/auth/refresh-token";
+  const refreshUrl = `${getApiBaseUrl() || "/api"}/auth/refresh-token`;
   try {
     const { data } = await axios.post<RefreshResponse>(
       refreshUrl,

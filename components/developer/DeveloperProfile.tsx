@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import axios from "axios";
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import ErrorMsg from "@/components/utilities/Error";
@@ -11,6 +12,7 @@ import Loader from "@/components/utilities/Loader";
 import LoaderBlock from "@/components/utilities/LoaderBlock";
 import { FaLongArrowAltRight } from "react-icons/fa";
 import PostOwnerActions from "@/components/feed/PostOwnerActions";
+import NotFoundState from "@/components/shared/NotFoundState";
 
 type PublicUser = {
   _id: string;
@@ -75,6 +77,7 @@ export default function DeveloperProfile({ username }: { username: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
 
@@ -115,6 +118,7 @@ export default function DeveloperProfile({ username }: { username: string }) {
     setInfo(null);
     setDev(null);
     setRelationship(null);
+    setNotFound(false);
     setPosts([]);
 
     (async () => {
@@ -126,10 +130,19 @@ export default function DeveloperProfile({ username }: { username: string }) {
         if (cancelled) return;
         const uid = String(meId ?? "");
         if (!uid) throw new Error("Unauthorized");
-        const { dev: nextDev, relationship: nextRel } = await load(
-          normalized,
-          uid,
-        );
+        let nextDev: PublicUser;
+        let nextRel: Friend | null;
+        try {
+          const loaded = await load(normalized, uid);
+          nextDev = loaded.dev;
+          nextRel = loaded.relationship;
+        } catch (e) {
+          if (axios.isAxiosError(e) && e.response?.status === 404) {
+            if (!cancelled) setNotFound(true);
+            return;
+          }
+          throw e;
+        }
         if (cancelled) return;
         setDev(nextDev);
         setRelationship(nextRel);
@@ -232,6 +245,17 @@ export default function DeveloperProfile({ username }: { username: string }) {
         }
       />
     );
+
+  if (notFound) {
+    return (
+      <NotFoundState
+        title="Developer not found"
+        message="This profile doesn’t exist."
+        ctaHref="/"
+        ctaLabel="Back to feed"
+      />
+    );
+  }
 
   if (error)
     return <ErrorMsg message={<span className="text-sm">{error}</span>} />;

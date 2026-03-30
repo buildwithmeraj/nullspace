@@ -7,6 +7,7 @@ import { RefreshCcw } from "lucide-react";
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import Loader from "@/components/utilities/Loader";
+import InfoMsg from "@/components/utilities/Info";
 
 type SuggestedUser = {
   _id: string;
@@ -58,11 +59,23 @@ export default function SuggestedUsers({ limit = 10 }: { limit?: number }) {
     void fetchSuggestions();
   }, [fetchSuggestions]);
 
-  if (!canLoad) {
+  if (loading) {
     return (
       <div className="text-sm opacity-70">
         <Loader label="Loading suggestions…" />
       </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <InfoMsg
+        message={
+          <span className="text-sm">
+            Log in to see developer suggestions.
+          </span>
+        }
+      />
     );
   }
 
@@ -141,4 +154,3 @@ export default function SuggestedUsers({ limit = 10 }: { limit?: number }) {
     </section>
   );
 }
-

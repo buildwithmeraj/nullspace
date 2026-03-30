@@ -150,13 +150,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 	  const authRequest = async (path: string, init?: RequestInit) => {
 	    const base = getApiBaseUrl();
-	    // Always include cookies so the backend can read/rotate the refreshToken session cookie.
+	    // Always include cookies so the backend can read/rotate the refreshToken cookie.
+	    // In production (Vercel ↔ Render), the refresh cookie lives on the backend domain,
+	    // so we must call the backend directly (not via Next `/api` rewrites).
 	    const url =
-	      typeof window === "undefined"
-	        ? base
-	          ? `${base}${path}`
-	          : toProxyUrl(path)
-	        : toProxyUrl(path);
+	      base && typeof window !== "undefined"
+	        ? `${base}${path}`
+	        : typeof window === "undefined"
+	          ? base
+	            ? `${base}${path}`
+	            : toProxyUrl(path)
+	          : toProxyUrl(path);
 	    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 	    const controller = init?.signal ? null : new AbortController();
 	    try {

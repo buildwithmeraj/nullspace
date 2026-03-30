@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +15,7 @@ import PostInteractions from "@/components/feed/PostInteractions";
 import LoaderBlock from "@/components/utilities/LoaderBlock";
 import Loader from "@/components/utilities/Loader";
 import PostOwnerActions from "@/components/feed/PostOwnerActions";
+import NotFoundState from "@/components/shared/NotFoundState";
 
 type PostImage = { url: string; publicId?: string; width?: number; height?: number };
 type PostAuthor = { _id: string; name?: string; username?: string; image?: string } | null;
@@ -41,6 +43,7 @@ export default function PostDetail({
 
   const [post, setPost] = useState<Post | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
 
@@ -48,6 +51,7 @@ export default function PostDetail({
     let cancelled = false;
     setPost(null);
     setError(null);
+    setNotFound(false);
     setLoading(true);
 
     void (async () => {
@@ -73,8 +77,11 @@ export default function PostDetail({
 
         setPost(res.data);
       } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : "Failed to load post");
+        if (axios.isAxiosError(e) && e.response?.status === 404) {
+          if (!cancelled) setNotFound(true);
+          return;
+        }
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load post");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -87,6 +94,17 @@ export default function PostDetail({
 
   if (authLoading) return <Loader label="Loading session…" />;
   if (!user) return <RequireLogin title="Post" message={<span className="text-sm">Log in to view this post.</span>} />;
+
+  if (notFound) {
+    return (
+      <NotFoundState
+        title="Post not found"
+        message="This post doesn’t exist (or was deleted)."
+        ctaHref="/"
+        ctaLabel="Back to feed"
+      />
+    );
+  }
 
   if (error) return <ErrorMsg message={<span className="text-sm">{error}</span>} />;
   if (loading || !post) return <LoaderBlock />;

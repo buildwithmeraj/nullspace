@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import ErrorMsg from "@/components/utilities/Error";
 // Define the type for your form data
 interface FormData {
   name: string;
@@ -41,15 +42,20 @@ const Register = () => {
     // Your backend expects a single file field named `image`.
     body.append("image", file);
 
-    const res = await fetch("/api/cloudinary/upload", {
+    const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ?? "";
+    const uploadUrl = base
+      ? `${base}/cloudinary/upload`
+      : "/api/cloudinary/upload";
+    const res = await fetch(uploadUrl, {
       method: "POST",
       body,
       credentials: "include",
     });
 
-    const json = (await res.json().catch(() => null)) as
-      | { success?: boolean; data?: { url?: string } }
-      | null;
+    const json = (await res.json().catch(() => null)) as {
+      success?: boolean;
+      data?: { url?: string };
+    } | null;
 
     const url = json?.data?.url;
     if (!res.ok || !json?.success || !url) {
@@ -94,67 +100,86 @@ const Register = () => {
   };
 
   return (
-    <div className="mx-auto w-full max-w-sm">
+    <div className="mx-auto w-full max-w-3xl">
       <div className="card bg-base-100 w-full shrink-0 border border-base-200 shadow-sm transition-shadow hover:shadow-md">
-      <form className="card-body" onSubmit={handleSubmit}>
-        <fieldset className="fieldset">
-          {error ? <div className="text-error text-sm">{error}</div> : null}
-          <label className="label">Name</label>
-          <input
-            type="text"
-            className="input input-bordered"
-            placeholder="Full Name"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-          <label className="label">Email</label>
-          <input
-            type="email"
-            className="input input-bordered"
-            placeholder="Email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-          <label className="label">Password</label>
-          <input
-            type="password"
-            className="input input-bordered"
-            placeholder="Password"
-            id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-          <label className="label">Photo</label>
-          <input
-            type="file"
-            className="file-input file-input-bordered"
-            accept="image/*"
-            id="image"
-            name="image"
-            onChange={handleChange}
-            required
-          />
-          <button className="btn btn-primary mt-4" disabled={loading || uploading}>
-            {uploading || loading ? "Loading..." : "Register"}
-          </button>
-          <div className="divider">OR</div>
-          <button type="button" className="btn btn-outline" onClick={startGoogleLogin}>
-            Continue with Google
-          </button>
-          <Link className="link link-hover text-sm" href="/login">
-            Already have an account? Log in
-          </Link>
-        </fieldset>
-      </form>
-    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 items-center">
+          <form className="card-body" onSubmit={handleSubmit}>
+            <h2 className="font-bold text-3xl text-center">Register</h2>
+            <fieldset className="fieldset">
+              {error ? <ErrorMsg message={<span>{error}</span>} /> : null}
+              <label className="label">Name</label>
+              <input
+                type="text"
+                className="input input-bordered"
+                placeholder="Full Name"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+              />
+              <label className="label">Email</label>
+              <input
+                type="email"
+                className="input input-bordered"
+                placeholder="Email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
+              <label className="label">Password</label>
+              <input
+                type="password"
+                className="input input-bordered"
+                placeholder="Password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+              <label className="label">Photo</label>
+              <input
+                type="file"
+                className="file-input file-input-bordered"
+                accept="image/*"
+                id="image"
+                name="image"
+                onChange={handleChange}
+                required
+              />
+              <button
+                className="btn btn-primary mt-4"
+                disabled={loading || uploading}
+              >
+                {uploading || loading ? "Loading..." : "Register"}
+              </button>
+              <div className="divider my-1">OR</div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={startGoogleLogin}
+              >
+                Continue with Google
+              </button>
+              <p className="my-1 text-center">
+                <Link className="link link-hover text-sm" href="/login">
+                  Already have an account?
+                </Link>
+              </p>
+            </fieldset>
+          </form>
+          <div className="hidden md:block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://res.cloudinary.com/dwicoeqnl/image/upload/v1774865028/uploads/lplmsnsy9afll2uuf1mp.png"
+              alt="Register"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

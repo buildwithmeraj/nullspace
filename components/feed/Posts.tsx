@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import InfoMsg from "@/components/utilities/Info";
-import RequireLogin from "@/components/auth/RequireLogin";
 import Link from "next/link";
 import PostInteractions from "@/components/feed/PostInteractions";
 import { FaLongArrowAltRight } from "react-icons/fa";
@@ -209,10 +208,32 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
 
   if (!user)
     return (
-      <RequireLogin
-        title="Feed"
-        message={<span className="text-sm">Log in to see posts.</span>}
-      />
+      <div className="p-6">
+        <h2 className="font-bold text-2xl text-center my-3">
+          Welcome to NullSpace
+        </h2>
+        <p className="opacity-60">
+          The place for developers to connect, share, and grow. NullSpace is a
+          community for developers to collaborate and learn from each other.
+          NullSpace supports markdown and code snippets. To get started, please
+          <Link className="text-secondary font-bold" href="/login">
+            {" "}
+            login
+          </Link>{" "}
+          or{" "}
+          <Link className="text-secondary font-bold" href="/register">
+            {" "}
+            register
+          </Link>{" "}
+          .
+        </p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://res.cloudinary.com/dwicoeqnl/image/upload/v1774867206/uploads/ovazn7napy2zx1viodza.png"
+          alt="Notice"
+          className="w-full h-auto"
+        />
+      </div>
     );
 
   if (needsUsername)
@@ -288,7 +309,9 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                     content={post.content}
                     onUpdated={({ content }) =>
                       setPosts((prev) =>
-                        prev.map((p) => (p._id === post._id ? { ...p, content } : p)),
+                        prev.map((p) =>
+                          p._id === post._id ? { ...p, content } : p,
+                        ),
                       )
                     }
                     onDeleted={() =>
@@ -313,10 +336,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                     {preview}
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                    <Link
-                      className="btn btn-sm btn-ghost gap-2"
-                      href={href}
-                    >
+                    <Link className="btn btn-sm btn-ghost gap-2" href={href}>
                       View full post <FaLongArrowAltRight />
                     </Link>
                     {isLong ? (

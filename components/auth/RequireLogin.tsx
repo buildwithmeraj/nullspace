@@ -34,15 +34,13 @@ export default function RequireLogin({
         <InfoMsg
           message={
             message ?? (
-              <span className="text-sm">
-                You need to log in to continue.
-              </span>
+              <span className="text-sm">You need to log in to continue.</span>
             )
           }
         />
-        <div className="card-actions justify-end">
+        <div className="card-actions justify-center">
           <Link
-            className="btn btn-neutral"
+            className="btn btn-secondary"
             href={`/login?next=${encodeURIComponent(next)}`}
           >
             Go to login
@@ -52,4 +50,3 @@ export default function RequireLogin({
     </section>
   );
 }
-
