@@ -80,7 +80,9 @@ async function authRequest(path: string, init?: RequestInit) {
   try {
     const timeoutMs = 12_000;
     timeoutId =
-      controller != null ? setTimeout(() => controller.abort(), timeoutMs) : null;
+      controller != null
+        ? setTimeout(() => controller.abort(), timeoutMs)
+        : null;
 
     return await fetch(url, {
       ...init,
@@ -128,10 +130,15 @@ function getStringField(root: unknown, key: string): string | undefined {
 function pickAuthPayload(json: unknown) {
   // Normalizes various backend response shapes into `{ user, token, error }`.
   const data = getNestedRecord(json, "data");
+
+  // Check if the entire `data` object IS the user (has _id, email, etc.)
+  const isDataTheUser = data && data._id && (data.email || data.googleId);
+
   const userCandidate =
     (isRecord(json) ? json.user : undefined) ??
-    (data ? data.user : undefined) ??
-    data;
+    (isDataTheUser ? data : null) ??
+    (data ? data.user : undefined);
+
   const token =
     (isRecord(json) ? (json.accessToken ?? json.token) : undefined) ??
     (data ? (data.accessToken ?? data.token) : undefined);
@@ -183,8 +190,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // For OAuth redirects, prefer navigating directly to the backend (avoids
     // Next proxy/rewrite edge-cases with 302 Location headers).
     if (apiBase) {
-      const normalized = googlePath.startsWith("/") ? googlePath : `/${googlePath}`;
-      window.location.assign(`${apiBase}${normalized}`);
+      const normalized = googlePath.startsWith("/")
+        ? googlePath
+        : `/${googlePath}`;
+      // Include redirect parameter so backend can send user back to /auth/callback
+      window.location.assign(
+        `${apiBase}${normalized}?redirect=${encodeURIComponent(window.location.origin + "/auth/callback")}`,
+      );
       return;
     }
 
