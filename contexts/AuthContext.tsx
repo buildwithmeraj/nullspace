@@ -37,6 +37,7 @@ type AuthContextValue = {
   startGoogleLogin: () => void;
   logout: () => Promise<void>;
   silentRefresh: () => Promise<boolean>;
+  hydrateMe: (token?: string | null) => Promise<boolean>;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   setAccessToken: React.Dispatch<React.SetStateAction<string | null>>;
 };
@@ -184,15 +185,57 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 	    }
 	  };
 
+  const hydrateMe = async (tokenOverride?: string | null): Promise<boolean> => {
+    const token =
+      tokenOverride ??
+      accessToken ??
+      (typeof window !== "undefined"
+        ? sessionStorage.getItem("accessToken")
+        : null);
+    if (!token) return false;
+
+    const res = await authRequest("/users/me", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res) return false;
+    if (!res.ok) {
+      // Token is invalid/expired → clear caches so UI doesn't loop.
+      if (res.status === 401 || res.status === 403) {
+        setUser(null);
+        setAccessToken(null);
+        try {
+          sessionStorage.removeItem("accessToken");
+        } catch {
+          // ignore
+        }
+      }
+      return false;
+    }
+
+    const json = await safeJson(res);
+    const { user: nextUser } = pickAuthPayload(json);
+    if (nextUser) setUser(nextUser);
+    return Boolean(nextUser);
+  };
+
   const silentRefresh = async (): Promise<boolean> => {
     // Hydrates the session on page load (and rotates tokens on the backend).
     const res = await authRequest("/auth/refresh-token", { method: "POST" });
     if (!res) return false;
     if (!res.ok) {
-      // Refresh cookie is missing/invalid → treat as logged out and clear caches.
-      setUser(null);
-      setAccessToken(null);
-      sessionStorage.removeItem("accessToken");
+      // Refresh cookie is missing/invalid. If we still have a cached access token
+      // (OAuth redirect, or third‑party cookies blocked), keep it and let token-based
+      // auth continue working.
+      const hasCachedToken =
+        Boolean(accessToken) ||
+        (typeof window !== "undefined" &&
+          Boolean(sessionStorage.getItem("accessToken")));
+      if (!hasCachedToken) {
+        setUser(null);
+        setAccessToken(null);
+        sessionStorage.removeItem("accessToken");
+      }
       // Don't auto-call `/users/logout` here: a transient refresh failure shouldn't wipe cookies.
       return false;
     }
@@ -212,8 +255,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         // Fast path: show "logged in" UI immediately if we have a cached token.
         const storedToken = sessionStorage.getItem("accessToken");
-        if (storedToken) setAccessToken(storedToken);
-        await silentRefresh();
+        if (storedToken) {
+          setAccessToken(storedToken);
+          await hydrateMe(storedToken);
+          // Best-effort: rotate tokens via refresh cookie (may be blocked cross-site).
+          void silentRefresh();
+        } else {
+          await silentRefresh();
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -306,6 +355,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         startGoogleLogin,
         logout,
         silentRefresh,
+        hydrateMe,
         setUser,
         setAccessToken,
       }}
