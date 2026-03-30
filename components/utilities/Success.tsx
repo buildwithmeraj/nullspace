@@ -8,7 +8,7 @@ const SuccessMsg = ({ message }: AlertComponentProps) => {
   return (
     <div
       role="alert"
-      className="alert alert-success alert-soft mt-2 text-lg p-4"
+      className="alert alert-success alert-soft text-sm p-3"
     >
       <CircleCheckBig size={18} />
       {message}

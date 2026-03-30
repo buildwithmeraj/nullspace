@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import toast from "react-hot-toast";
 
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -123,7 +124,7 @@ export default function PostInteractions({ postId }: { postId: string }) {
         if (summary?.data) setReaction(summary.data);
       }
     } catch {
-      // ignore
+      toast.error("Failed to update reaction");
     } finally {
       setReactionLoading(false);
     }
@@ -146,7 +147,7 @@ export default function PostInteractions({ postId }: { postId: string }) {
       });
       setComments(res?.data ?? []);
     } catch {
-      // ignore
+      toast.error("Failed to load comments");
     } finally {
       setCommentsLoading(false);
     }
@@ -170,7 +171,7 @@ export default function PostInteractions({ postId }: { postId: string }) {
         setCommentText("");
       }
     } catch {
-      // ignore
+      toast.error("Failed to post comment");
     } finally {
       setCommentSubmitting(false);
     }

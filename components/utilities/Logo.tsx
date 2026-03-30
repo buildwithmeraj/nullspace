@@ -3,7 +3,7 @@ import Icon from "./Icon";
 
 const Logo = () => {
   return (
-    <span className="inline-flex items-center gap-1 text-2xl font-bold leading-none logo">
+    <span className="flex items-center gap-1 text-2xl logo">
       <Icon />
       <span className="logo-text">NullSpace</span>
     </span>

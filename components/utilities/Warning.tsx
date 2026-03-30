@@ -7,7 +7,7 @@ const WarningMsg = ({ message }: AlertComponentProps) => {
   return (
     <div
       role="alert"
-      className="alert alert-warning alert-soft mt-2 text-lg p-4"
+      className="alert alert-warning alert-soft text-sm p-3"
     >
       <PiWarningFill className="-mr-2 mt-0.5" size={20} />
       {message}

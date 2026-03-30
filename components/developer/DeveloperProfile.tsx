@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import ErrorMsg from "@/components/utilities/Error";
 import SuccessMsg from "@/components/utilities/Success";
 import RequireLogin from "@/components/auth/RequireLogin";
+import Loader from "@/components/utilities/Loader";
+import LoaderBlock from "@/components/utilities/LoaderBlock";
 
 type PublicUser = {
   _id: string;
@@ -170,7 +172,7 @@ export default function DeveloperProfile({ username }: { username: string }) {
     }
   };
 
-  if (loading) return <div className="opacity-70 text-sm">Loading…</div>;
+  if (loading) return <Loader label="Loading session…" />;
   if (!user)
     return (
       <RequireLogin
@@ -184,7 +186,7 @@ export default function DeveloperProfile({ username }: { username: string }) {
     );
 
   if (error) return <ErrorMsg message={<span className="text-sm">{error}</span>} />;
-  if (!dev) return <div className="opacity-70 text-sm">Loading profile…</div>;
+  if (!dev) return <LoaderBlock />;
 
   const isMe =
     String(dev.username ?? "").trim() &&
@@ -201,7 +203,7 @@ export default function DeveloperProfile({ username }: { username: string }) {
     <div className="mx-auto w-full max-w-4xl px-3 sm:px-4 py-6 space-y-4">
       {info ? <SuccessMsg message={<span className="text-sm">{info}</span>} /> : null}
 
-      <section className="card bg-base-100 shadow">
+      <section className="card bg-base-100 border border-base-200 shadow-sm">
         <div className="card-body">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">

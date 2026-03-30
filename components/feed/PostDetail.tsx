@@ -11,6 +11,8 @@ import RequireLogin from "@/components/auth/RequireLogin";
 import ErrorMsg from "@/components/utilities/Error";
 import MarkdownContent from "@/components/markdown/MarkdownContent";
 import PostInteractions from "@/components/feed/PostInteractions";
+import LoaderBlock from "@/components/utilities/LoaderBlock";
+import Loader from "@/components/utilities/Loader";
 
 type PostImage = { url: string; publicId?: string; width?: number; height?: number };
 type PostAuthor = { _id: string; name?: string; username?: string; image?: string } | null;
@@ -81,11 +83,11 @@ export default function PostDetail({
     };
   }, [authLoading, postId, router, user, username]);
 
-  if (authLoading) return <div className="opacity-70 text-sm">Loading…</div>;
+  if (authLoading) return <Loader label="Loading session…" />;
   if (!user) return <RequireLogin title="Post" message={<span className="text-sm">Log in to view this post.</span>} />;
 
   if (error) return <ErrorMsg message={<span className="text-sm">{error}</span>} />;
-  if (loading || !post) return <div className="opacity-70 text-sm">Loading post…</div>;
+  if (loading || !post) return <LoaderBlock />;
 
   const authorUsername = String(post.user?.username ?? "").trim();
   const authorName = String(post.user?.name ?? authorUsername ?? "Unknown");
@@ -98,7 +100,7 @@ export default function PostDetail({
         </Link>
       </div>
 
-      <article className="card bg-base-100 shadow">
+      <article className="card bg-base-100 border border-base-200 shadow-sm">
         <div className="card-body space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">

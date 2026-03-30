@@ -1,42 +1,32 @@
 import React from "react";
+import Link from "next/link";
+import Logo from "@/components/utilities/Logo";
 
 const Footer = () => {
   return (
-    <footer className="footer sm:footer-horizontal bg-base-200 text-base-content p-10">
-      <nav>
-        <h6 className="footer-title">Services</h6>
-        <a className="link link-hover">Branding</a>
-        <a className="link link-hover">Design</a>
-        <a className="link link-hover">Marketing</a>
-        <a className="link link-hover">Advertisement</a>
-      </nav>
-      <nav>
-        <h6 className="footer-title">Company</h6>
-        <a className="link link-hover">About us</a>
-        <a className="link link-hover">Contact</a>
-        <a className="link link-hover">Jobs</a>
-        <a className="link link-hover">Press kit</a>
-      </nav>
-      <nav>
-        <h6 className="footer-title">Legal</h6>
-        <a className="link link-hover">Terms of use</a>
-        <a className="link link-hover">Privacy policy</a>
-        <a className="link link-hover">Cookie policy</a>
-      </nav>
-      <form>
-        <h6 className="footer-title">Newsletter</h6>
-        <fieldset className="w-80">
-          <label>Enter your email address</label>
-          <div className="join">
-            <input
-              type="text"
-              placeholder="username@site.com"
-              className="input input-bordered join-item"
-            />
-            <button className="btn btn-primary join-item">Subscribe</button>
+    <footer className="border-t border-base-200 bg-base-100">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-10 flex flex-col sm:flex-row gap-8 items-start sm:items-center justify-between">
+        <div className="space-y-2">
+          <div className="text-xl font-semibold">
+            <Logo />
           </div>
-        </fieldset>
-      </form>
+          <p className="text-sm opacity-70 max-w-md">
+            A developer-focused social space to share posts, code, and ideas.
+          </p>
+        </div>
+
+        <nav className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+          <Link className="link link-hover" href="/about">
+            About
+          </Link>
+          <Link className="link link-hover" href="/privacy">
+            Privacy Policy
+          </Link>
+          <Link className="link link-hover" href="/terms">
+            Terms of Service
+          </Link>
+        </nav>
+      </div>
     </footer>
   );
 };

@@ -142,7 +142,7 @@ export default function UpdateProfile() {
   const needsUsername = !String(user.username ?? "").trim();
 
   return (
-    <section className="card bg-base-100 shadow">
+    <section className="card bg-base-100 border border-base-200 shadow-sm">
       <div className="card-body space-y-4">
         <div>
           <h2 className="card-title text-base">Edit profile</h2>

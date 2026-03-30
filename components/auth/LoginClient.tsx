@@ -19,7 +19,7 @@ export default function LoginClient() {
   });
 
   return (
-    <div className="space-y-3">
+    <div className="mx-auto w-full max-w-sm space-y-3">
       {error === "use_credentials" ? (
         <InfoMsg
           message={

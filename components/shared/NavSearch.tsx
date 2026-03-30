@@ -38,6 +38,13 @@ type SearchPostsResponse = {
   message?: string;
 };
 
+export type NavSearchProps = {
+  autoFocus?: boolean;
+  inputClassName?: string;
+  dropdownClassName?: string;
+  onNavigate?: () => void;
+};
+
 function excerpt(text: string, max = 110) {
   const t = String(text ?? "")
     .replace(/\s+/g, " ")
@@ -46,7 +53,9 @@ function excerpt(text: string, max = 110) {
   return `${t.slice(0, max - 1)}…`;
 }
 
-export default function NavSearch() {
+export default function NavSearch(props: NavSearchProps = {}) {
+  // Reused in navbar across breakpoints (desktop inline + mobile overlay).
+  const { autoFocus, inputClassName, dropdownClassName, onNavigate } = props;
   const { user, loading: authLoading } = useAuth();
   const pathname = usePathname();
 
@@ -54,16 +63,22 @@ export default function NavSearch() {
   const needsUsername = Boolean(user) && !username;
 
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(autoFocus));
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<SearchUser[]>([]);
   const [posts, setPosts] = useState<SearchPost[]>([]);
 
   const rootRef = useRef<HTMLDivElement | null>(null);
   const lastQueryRef = useRef<string>("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const canSearch = !authLoading && Boolean(user) && !needsUsername;
   const trimmed = useMemo(() => query.trim(), [query]);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    inputRef.current?.focus();
+  }, [autoFocus]);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -122,7 +137,8 @@ export default function NavSearch() {
       <input
         type="text"
         placeholder="Search"
-        className="input input-bordered w-48 sm:w-72"
+        ref={inputRef}
+        className={`input input-bordered ${inputClassName ?? "w-48 sm:w-72"}`}
         value={query}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
@@ -142,7 +158,9 @@ export default function NavSearch() {
       />
 
       {open ? (
-        <div className="absolute -right-3 mt-1 w-[20rem] max-w-[90vw] rounded-md border border-base-300 bg-base-100 shadow-xl z-50 overflow-hidden">
+        <div
+          className={`absolute mt-1 rounded-md border border-base-300 bg-base-100 shadow-xl z-50 overflow-hidden ${dropdownClassName ?? "-right-3 w-[20rem] max-w-[90vw]"}`}
+        >
           {authLoading ? (
             <div className="p-3 text-sm opacity-70">Checking session…</div>
           ) : !user ? (
@@ -190,6 +208,7 @@ export default function NavSearch() {
                             setUsers([]);
                             setPosts([]);
                             setLoading(false);
+                            onNavigate?.();
                           }}
                         >
                           <div className="flex items-center gap-3">
@@ -240,6 +259,7 @@ export default function NavSearch() {
                               setUsers([]);
                               setPosts([]);
                               setLoading(false);
+                              onNavigate?.();
                             }}
                           >
                             <div className="min-w-0">

@@ -4,15 +4,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import InfoMsg from "@/components/utilities/Info";
 import RequireLogin from "@/components/auth/RequireLogin";
 import Link from "next/link";
+import LoaderBlock from "@/components/utilities/LoaderBlock";
 
   const Profile = () => {
   const { user, loading, logout } = useAuth();
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <LoaderBlock />;
   if (!user)
     return <RequireLogin title="Profile" message={<span className="text-sm">Log in to view your profile.</span>} />;
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
-      <section className="card bg-base-100 shadow">
+      <section className="card bg-base-100 border border-base-200 shadow-sm">
         <div className="card-body space-y-2">
           <div className="flex items-start justify-between gap-3">
             <div>

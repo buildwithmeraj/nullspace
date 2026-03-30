@@ -1,10 +1,17 @@
 import UpdateProfile from "@/components/auth/UpdateProfile";
 import { Suspense } from "react";
+import type { Metadata } from "next";
+import Loader from "@/components/utilities/Loader";
+
+export const metadata: Metadata = {
+  title: "Update Profile",
+  description: "Update your username, name, and profile picture.",
+};
 
 export default function EditProfilePage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-6">
-      <Suspense fallback={<p className="opacity-70 text-sm">Loading…</p>}>
+      <Suspense fallback={<Loader label="Loading…" />}>
         <UpdateProfile />
       </Suspense>
     </div>

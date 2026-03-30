@@ -11,8 +11,10 @@ import axios from "axios";
 import { useAuth } from "@/contexts/AuthContext";
 import { protectedApiRequest } from "@/lib/api";
 import InfoMsg from "@/components/utilities/Info";
+import ErrorMsg from "@/components/utilities/Error";
 import RequireLogin from "@/components/auth/RequireLogin";
 import { Wand2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
@@ -66,7 +68,6 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const [uploading, setUploading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const previewOptions = useMemo(() => {
     const highlight: [
@@ -161,7 +162,6 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
 
   const submit = async () => {
     setError(null);
-    setSuccess(null);
     const nextContent = content.trim();
     if (!nextContent) {
       setError("Post content is required");
@@ -200,7 +200,7 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
 
       setContent("");
       setImageFiles([]);
-      setSuccess("Post created");
+      toast.success(res?.message ?? "Post created");
       onCreated?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create post");
@@ -212,7 +212,6 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
 
   const enhance = async () => {
     setError(null);
-    setSuccess(null);
 
     const raw = content.trim();
     if (!raw) {
@@ -253,7 +252,7 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
         return;
       }
       setContent(next);
-      setSuccess("Post enhanced");
+      toast.success(json?.message ?? "Post enhanced");
     } catch (e) {
       if (axios.isAxiosError(e)) {
         const data = e.response?.data as unknown;
@@ -331,7 +330,7 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   };
 
   return (
-    <section className="card bg-base-100 w-full shadow-xl">
+    <section className="card bg-base-100 w-full border border-base-200 shadow-sm">
       <div className="card-body space-y-3">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -367,10 +366,7 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
         ) : (
           <>
             {error ? (
-              <div className="alert alert-error py-2">{error}</div>
-            ) : null}
-            {success ? (
-              <div className="alert alert-success py-2">{success}</div>
+              <ErrorMsg message={<span className="text-sm">{error}</span>} />
             ) : null}
 
             <div data-color-mode={colorMode}>

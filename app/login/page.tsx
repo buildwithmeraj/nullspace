@@ -1,12 +1,16 @@
-"use client";
-
 import { Suspense } from "react";
 import LoginClient from "@/components/auth/LoginClient";
+import type { Metadata } from "next";
 
-const Page = () => (
-  <Suspense fallback={null}>
-    <LoginClient />
-  </Suspense>
-);
+export const metadata: Metadata = {
+  title: "Login",
+  description: "Log in to your NullSpace account.",
+};
 
-export default Page;
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <LoginClient />
+    </Suspense>
+  );
+}

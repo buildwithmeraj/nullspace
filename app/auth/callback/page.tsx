@@ -1,5 +1,11 @@
 import { Suspense } from "react";
 import AuthCallbackClient from "./AuthCallbackClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Authenticating",
+  description: "Completing sign-in…",
+};
 
 export default function AuthCallbackPage() {
   return (
@@ -8,4 +14,3 @@ export default function AuthCallbackPage() {
     </Suspense>
   );
 }
-

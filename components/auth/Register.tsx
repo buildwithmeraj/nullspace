@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 // Define the type for your form data
 interface FormData {
   name: string;
@@ -76,24 +77,32 @@ const Register = () => {
         password: formData.password,
         image: imageUrl,
       });
-      if (!res.ok) setError(res.error ?? "Registration failed");
-      else router.push("/profile");
+      if (!res.ok) {
+        const msg = res.error ?? "Registration failed";
+        setError(msg);
+        toast.error(msg);
+      } else {
+        toast.success("Account created");
+        router.push("/profile");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
+      toast.error(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="card bg-base-100 w-full max-w-sm shrink-0 shadow-2xl">
+    <div className="mx-auto w-full max-w-sm">
+      <div className="card bg-base-100 w-full shrink-0 border border-base-200 shadow-sm transition-shadow hover:shadow-md">
       <form className="card-body" onSubmit={handleSubmit}>
         <fieldset className="fieldset">
           {error ? <div className="text-error text-sm">{error}</div> : null}
           <label className="label">Name</label>
           <input
             type="text"
-            className="input"
+            className="input input-bordered"
             placeholder="Full Name"
             id="name"
             name="name"
@@ -104,7 +113,7 @@ const Register = () => {
           <label className="label">Email</label>
           <input
             type="email"
-            className="input"
+            className="input input-bordered"
             placeholder="Email"
             id="email"
             name="email"
@@ -115,7 +124,7 @@ const Register = () => {
           <label className="label">Password</label>
           <input
             type="password"
-            className="input"
+            className="input input-bordered"
             placeholder="Password"
             id="password"
             name="password"
@@ -126,23 +135,26 @@ const Register = () => {
           <label className="label">Photo</label>
           <input
             type="file"
-            className="input"
+            className="file-input file-input-bordered"
             accept="image/*"
             id="image"
             name="image"
             onChange={handleChange}
             required
           />
-          <button className="btn btn-neutral mt-4" disabled={loading || uploading}>
+          <button className="btn btn-primary mt-4" disabled={loading || uploading}>
             {uploading || loading ? "Loading..." : "Register"}
           </button>
           <div className="divider">OR</div>
           <button type="button" className="btn btn-outline" onClick={startGoogleLogin}>
             Continue with Google
           </button>
-          <Link href="/login">Login</Link>
+          <Link className="link link-hover text-sm" href="/login">
+            Already have an account? Log in
+          </Link>
         </fieldset>
       </form>
+    </div>
     </div>
   );
 };

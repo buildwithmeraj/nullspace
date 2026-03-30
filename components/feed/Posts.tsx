@@ -8,6 +8,7 @@ import RequireLogin from "@/components/auth/RequireLogin";
 import Link from "next/link";
 import PostInteractions from "@/components/feed/PostInteractions";
 import { FaLongArrowAltRight } from "react-icons/fa";
+import Loader from "../utilities/Loader";
 
 type PostImage = {
   url: string;
@@ -37,6 +38,41 @@ type FeedResponse = {
 };
 
 const PAGE_SIZE = 15;
+
+function FeedSkeleton() {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: 3 }).map((_, idx) => (
+        <div
+          key={idx}
+          className="card bg-base-100 border border-base-200 shadow-sm"
+        >
+          <div className="card-body space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="skeleton w-10 h-10 rounded-full" />
+                <div className="space-y-2">
+                  <div className="skeleton h-4 w-36" />
+                  <div className="skeleton h-3 w-24" />
+                </div>
+              </div>
+              <div className="skeleton h-3 w-24" />
+            </div>
+            <div className="space-y-2">
+              <div className="skeleton h-3 w-full" />
+              <div className="skeleton h-3 w-5/6" />
+              <div className="skeleton h-3 w-2/3" />
+            </div>
+            <div className="flex gap-2">
+              <div className="skeleton h-8 w-24 rounded-btn" />
+              <div className="skeleton h-8 w-28 rounded-btn" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function toPlainExcerpt(markdown: string, maxChars: number) {
   const input = String(markdown ?? "");
@@ -166,8 +202,8 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, needsUsername, user, hasMore]);
 
-  if (authLoading || loading)
-    return <div className="opacity-70 text-sm">Loading posts…</div>;
+  if (authLoading) return <Loader label="Loading session…" />;
+  if (loading) return <FeedSkeleton />;
 
   if (!user)
     return (
@@ -198,7 +234,10 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   return (
     <div className="space-y-4">
       {posts.map((post) => (
-        <article key={post._id} className="card bg-base-100 shadow">
+        <article
+          key={post._id}
+          className="card bg-base-100 border border-base-200 shadow-sm transition-shadow hover:shadow-md"
+        >
           <div className="card-body space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
@@ -255,9 +294,9 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                   <p className="text-sm whitespace-pre-wrap break-words">
                     {preview}
                   </p>
-                  <div className="flex items-center justify-center">
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     <Link
-                      className="flex items-center gap-2 justify-center cursor-pointer opacity-50 hover:opacity-95 mt-3"
+                      className="btn btn-sm btn-ghost gap-2"
                       href={href}
                     >
                       View full post <FaLongArrowAltRight />
@@ -290,7 +329,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
 
       <div ref={sentinelRef} />
       {loadingMore ? (
-        <div className="opacity-70 text-sm">Loading more…</div>
+        <Loader label="Loading more…" />
       ) : !hasMore ? (
         <div className="opacity-70 text-sm">No more posts.</div>
       ) : null}

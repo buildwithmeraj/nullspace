@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import toast from "react-hot-toast";
 
 // Define the type for your form data
 interface FormData {
@@ -32,23 +33,30 @@ const Login = ({ nextPath }: { nextPath?: string | null }) => {
     try {
       setError(null);
       const res = await login(formData);
-      if (!res.ok) setError(res.error ?? "Login failed");
-      else router.replace(nextPath || "/profile");
+      if (!res.ok) {
+        const msg = res.error ?? "Login failed";
+        setError(msg);
+        toast.error(msg);
+      } else {
+        toast.success("Welcome back");
+        router.replace(nextPath || "/profile");
+      }
     } catch (error) {
       console.error("Login error:", error);
       setError("Login failed");
+      toast.error("Login failed");
     }
   };
 
   return (
-    <div className="card bg-base-100 w-full max-w-sm shrink-0 shadow-2xl">
+    <div className="card bg-base-100 w-full shrink-0 border border-base-200 shadow-sm transition-shadow hover:shadow-md">
       <form className="card-body" onSubmit={handleSubmit}>
         <fieldset className="fieldset">
           {error ? <div className="text-error text-sm">{error}</div> : null}
           <label className="label">Email</label>
           <input
             type="email"
-            className="input"
+            className="input input-bordered"
             placeholder="Email"
             id="email"
             name="email"
@@ -59,7 +67,7 @@ const Login = ({ nextPath }: { nextPath?: string | null }) => {
           <label className="label">Password</label>
           <input
             type="password"
-            className="input"
+            className="input input-bordered"
             placeholder="Password"
             id="password"
             name="password"
@@ -67,7 +75,7 @@ const Login = ({ nextPath }: { nextPath?: string | null }) => {
             onChange={handleChange}
             required
           />
-          <button className="btn btn-neutral mt-4" disabled={loading}>
+          <button className="btn btn-primary mt-4" disabled={loading}>
             {loading ? "Loading..." : "Login"}
           </button>
           <div className="divider">OR</div>
@@ -78,7 +86,9 @@ const Login = ({ nextPath }: { nextPath?: string | null }) => {
           >
             Continue with Google
           </button>
-          <Link href="/register">Register</Link>{" "}
+          <Link className="link link-hover text-sm" href="/register">
+            Create an account
+          </Link>
         </fieldset>
       </form>
     </div>
