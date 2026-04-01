@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function AuthCallbackClient() {
   const router = useRouter();
-  const { setAccessToken, silentRefresh, hydrateMe } = useAuth();
+  const { setAccessToken, hydrateMe } = useAuth();
 
   useEffect(() => {
     // Handle backend redirect (`?token=...`) and hydrate user before redirecting.
@@ -31,18 +31,11 @@ export default function AuthCallbackClient() {
           // Token-based hydration avoids issues when cross-site refresh cookies are blocked
           // (common on Vercel ↔ Render).
           void hydrateMe(token);
-          // Best-effort token rotation via refresh cookie; don't block navigation.
-          void silentRefresh();
           return;
         }
 
-        const ok = await silentRefresh();
-
-        if (cancelled) return;
-        const next =
-          sessionStorage.getItem("postLoginRedirect")?.trim() || "/profile";
-        if (ok) sessionStorage.removeItem("postLoginRedirect");
-        router.replace(ok ? next : "/login");
+        // Token-less flow is not expected in our app; fall back to login.
+        if (!cancelled) router.replace("/login");
       } catch {
         if (!cancelled) router.replace("/login");
       }

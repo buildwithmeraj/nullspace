@@ -49,6 +49,31 @@ export const api = axios.create({
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 type RefreshResponse = { accessToken: string };
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessTokenSingleFlight(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  const refreshUrl = `${getApiBaseUrl() || "/api"}/auth/refresh-token`;
+  refreshInFlight = (async () => {
+    try {
+      const { data } = await axios.post<RefreshResponse>(
+        refreshUrl,
+        {},
+        { withCredentials: true, timeout: 12_000 },
+      );
+      const token =
+        typeof data?.accessToken === "string" ? data.accessToken : null;
+      if (!token) clearClientAccessToken();
+      return token;
+    } catch {
+      clearClientAccessToken();
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
 
 api.interceptors.request.use((config) => {
   // Attach cached access token automatically in the browser (if caller didn't set it).
@@ -72,21 +97,15 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && config && !config._retry) {
       // One-time token refresh + retry. Backend must read httpOnly refresh cookie.
       config._retry = true;
-      const refreshUrl =
-        `${getApiBaseUrl() || "/api"}/auth/refresh-token`;
       try {
-        const { data } = await axios.post<RefreshResponse>(
-          refreshUrl,
-          {},
-          { withCredentials: true, timeout: 12_000 },
-        );
-        if (!data?.accessToken) {
+        const nextToken = await refreshAccessTokenSingleFlight();
+        if (!nextToken) {
           clearClientAccessToken();
           return Promise.reject(error);
         }
         config.headers = config.headers ?? {};
-        config.headers["Authorization"] = `Bearer ${data.accessToken}`;
-        setClientAccessToken(data.accessToken);
+        config.headers["Authorization"] = `Bearer ${nextToken}`;
+        setClientAccessToken(nextToken);
         return api(config); // retry original request
       } catch {
         // Refresh cookie is missing/expired → clear cached token to avoid retry loops.
@@ -113,18 +132,7 @@ type ProtectedRequestOptions = {
 };
 
 async function tryRefreshAccessToken(): Promise<string | null> {
-  const refreshUrl = `${getApiBaseUrl() || "/api"}/auth/refresh-token`;
-  try {
-    const { data } = await axios.post<RefreshResponse>(
-      refreshUrl,
-      {},
-      { withCredentials: true, timeout: 12_000 },
-    );
-    return typeof data?.accessToken === "string" ? data.accessToken : null;
-  } catch {
-    clearClientAccessToken();
-    return null;
-  }
+  return refreshAccessTokenSingleFlight();
 }
 
 // Makes an authenticated request using the shared `api` axios instance.

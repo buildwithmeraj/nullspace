@@ -50,6 +50,8 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+let silentRefreshInFlight: Promise<boolean> | null = null;
+
 function getApiBaseUrl() {
   // Used for server-side calls; in the browser we prefer `/api/*` (Next rewrite) to avoid CORS.
   const base = process.env.NEXT_PUBLIC_API_URL;
@@ -237,32 +239,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const silentRefresh = useCallback(async (): Promise<boolean> => {
-    // Hydrates the session on page load (and rotates tokens on the backend).
-    const res = await authRequest("/auth/refresh-token", { method: "POST" });
-    if (!res) return false;
-    if (!res.ok) {
-      // Refresh cookie is missing/invalid. If we still have a cached access token
-      // (OAuth redirect, or third‑party cookies blocked), keep it and let token-based
-      // auth continue working.
-      const hasCachedToken =
-        typeof window !== "undefined" &&
-        Boolean(sessionStorage.getItem("accessToken"));
-      if (!hasCachedToken) {
-        setUser(null);
-        setAccessToken(null);
-        sessionStorage.removeItem("accessToken");
+    // Single-flight to avoid concurrent refresh calls (backend rotates refresh tokens;
+    // simultaneous requests can trigger "token reuse detected" and invalidate the session).
+    if (silentRefreshInFlight) return silentRefreshInFlight;
+
+    silentRefreshInFlight = (async () => {
+      const res = await authRequest("/auth/refresh-token", { method: "POST" });
+      if (!res) return false;
+      if (!res.ok) {
+        // Refresh cookie is missing/invalid. If we still have a cached access token
+        // (OAuth redirect, or third‑party cookies blocked), keep it and let token-based
+        // auth continue working.
+        const hasCachedToken =
+          typeof window !== "undefined" &&
+          Boolean(sessionStorage.getItem("accessToken"));
+        if (!hasCachedToken) {
+          setUser(null);
+          setAccessToken(null);
+          sessionStorage.removeItem("accessToken");
+        }
+        return false;
       }
-      // Don't auto-call `/users/logout` here: a transient refresh failure shouldn't wipe cookies.
-      return false;
+      const json = await safeJson(res);
+      const { user: nextUser, token: nextToken } = pickAuthPayload(json);
+      if (nextToken) {
+        setAccessToken(nextToken);
+        sessionStorage.setItem("accessToken", nextToken);
+      }
+      if (nextUser) setUser(nextUser);
+      return Boolean(nextUser);
+    })();
+
+    try {
+      return await silentRefreshInFlight;
+    } finally {
+      silentRefreshInFlight = null;
     }
-    const json = await safeJson(res);
-    const { user: nextUser, token: nextToken } = pickAuthPayload(json);
-    if (nextToken) {
-      setAccessToken(nextToken);
-      sessionStorage.setItem("accessToken", nextToken);
-    }
-    if (nextUser) setUser(nextUser);
-    return Boolean(nextUser);
   }, []);
 
   useEffect(() => {
@@ -271,29 +283,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         // Fast path: cache token immediately if we have one (OAuth redirect, previous session).
         const storedToken = sessionStorage.getItem("accessToken");
-        if (storedToken) setAccessToken(storedToken);
-
-        // Prefer refresh-cookie session if available (rotates tokens on the backend).
-        const refreshed = await silentRefresh();
-        if (cancelled) return;
-
-        if (refreshed) {
-          setLoading(false);
-          return;
+        if (storedToken) {
+          setAccessToken(storedToken);
+          const ok = await hydrateMe(storedToken);
+          if (cancelled) return;
+          if (ok) {
+            setLoading(false);
+            return;
+          }
         }
 
-        // If we have a cached token but refresh-cookie failed (third‑party cookies blocked),
-        // keep `loading` true until `/users/me` hydration succeeds (handled by the effect below).
-        const hasToken = Boolean(sessionStorage.getItem("accessToken"));
-        if (!hasToken) setLoading(false);
+        // Prefer refresh-cookie session if available (rotates tokens on the backend).
+        await silentRefresh();
       } catch {
+        // ignore
+      } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [silentRefresh]);
+    // Intentionally runs once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // If we have an access token but no user yet, hydrate `/users/me` with retries.

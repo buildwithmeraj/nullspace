@@ -4,13 +4,13 @@ import InfoMsg from "@/components/utilities/Info";
 import Login from "@/components/auth/Login";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginClient() {
   const params = useSearchParams();
   const router = useRouter();
-  const { user, loading, silentRefresh } = useAuth();
+  const { user, loading, hydrateMe } = useAuth();
   const error = params.get("error");
   const next = params.get("next");
   const [storedNext] = useState<string | null>(() => {
@@ -22,8 +22,6 @@ export default function LoginClient() {
     }
   });
 
-  const refreshAttempted = useRef(false);
-
   useEffect(() => {
     // If a session already exists (OAuth callback, refresh-cookie), don't keep the
     // user on the login screen.
@@ -33,15 +31,12 @@ export default function LoginClient() {
       return;
     }
 
-    // Safety net: if the backend session exists but AuthProvider hasn't hydrated yet
-    // (cold starts / race conditions), try a one-time refresh from the login screen.
-    if (refreshAttempted.current) return;
-    refreshAttempted.current = true;
+    // Safety net: if we have an access token already, hydrate `/users/me` once.
     void (async () => {
-      const ok = await silentRefresh();
+      const ok = await hydrateMe();
       if (ok) router.replace(next ?? storedNext ?? "/profile");
     })();
-  }, [loading, next, router, silentRefresh, storedNext, user]);
+  }, [hydrateMe, loading, next, router, storedNext, user]);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-3">
