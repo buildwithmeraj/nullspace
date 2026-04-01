@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationsContext";
 
+const AUTH_PAGES = new Set(["/login", "/register", "/auth/callback"]);
 const ALLOWED_WHEN_MISSING_USERNAME = new Set([
   "/login",
   "/register",
@@ -22,6 +23,21 @@ export default function UsernameGate() {
   useEffect(() => {
     if (loading) return;
     if (!user) return;
+
+    // If the user is already authenticated, don't keep them on auth pages.
+    if (AUTH_PAGES.has(pathname)) {
+      const next =
+        (typeof window !== "undefined" &&
+          sessionStorage.getItem("postLoginRedirect")?.trim()) ||
+        "/profile";
+      try {
+        sessionStorage.removeItem("postLoginRedirect");
+      } catch {
+        // ignore
+      }
+      router.replace(next);
+      return;
+    }
 
     const username = String(user.username ?? "").trim();
     if (username) return;
