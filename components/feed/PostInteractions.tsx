@@ -64,6 +64,25 @@ function countUserIds(userIds: unknown) {
   return Array.isArray(userIds) ? userIds.length : 0;
 }
 
+function formatCommentDate(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const time = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const day = date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  return `${time.toLowerCase()}, ${day}`;
+}
+
 export default function PostInteractions({
   postId,
   defaultCommentsOpen = false,
@@ -101,7 +120,7 @@ export default function PostInteractions({
         url: `/comments?postId=${encodeURIComponent(postId)}`,
         method: "GET",
       });
-      setComments(Array.isArray(res?.data) ? res.data : []);
+      setComments(Array.isArray(res?.data) ? [...res.data].reverse() : []);
     } catch (error) {
       if (!silent) {
         const message = axios.isAxiosError(error)
@@ -145,8 +164,8 @@ export default function PostInteractions({
   }, [authLoading, postId, user]);
 
   useEffect(() => {
-    if (authLoading || !user) return;
-    setCommentsOpen(defaultCommentsOpen);
+    if (authLoading || !user || !defaultCommentsOpen) return;
+    setCommentsOpen(true);
     void fetchComments({ silent: true });
     // We only want the latest auth/post context to trigger a refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,7 +241,7 @@ export default function PostInteractions({
         data: { postId, content },
       });
       if (res?.data?._id) {
-        setComments((prev) => [res.data as Comment, ...prev]);
+        setComments((prev) => [...prev, res.data as Comment]);
         setCommentText("");
       }
     } catch {
@@ -282,7 +301,7 @@ export default function PostInteractions({
 
           <div className="flex gap-2">
             <textarea
-              className="textarea textarea-bordered w-full"
+              className="textarea textarea-bordered w-full rounded-xl"
               rows={2}
               placeholder="Write a comment…"
               value={commentText}
@@ -309,7 +328,7 @@ export default function PostInteractions({
                 return (
                   <div key={c._id} className="flex gap-3">
                     <div className="avatar">
-                      <div className="w-8 rounded-full bg-base-200">
+                      <div className="w-10 h-10 rounded-full bg-base-200">
                         {u?.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -321,7 +340,7 @@ export default function PostInteractions({
                         ) : null}
                       </div>
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 grid grid-cols-2 justify-between">
                       <div className="text-sm">
                         {uname ? (
                           <Link
@@ -339,6 +358,11 @@ export default function PostInteractions({
                           <span className="opacity-70"> @{uname}</span>
                         ) : null}
                       </div>
+                      {c.createdAt ? (
+                        <div className="text-xs opacity-60">
+                          {formatCommentDate(c.createdAt)}
+                        </div>
+                      ) : null}
                       <div className="text-sm">
                         <MarkdownContent
                           source={c.content}

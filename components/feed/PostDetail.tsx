@@ -149,12 +149,6 @@ export default function PostDetail({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-6 space-y-4">
-      <div className="text-sm">
-        <Link className="link" href="/">
-          ← Back to feed
-        </Link>
-      </div>
-
       <article className="card bg-base-100 border border-base-200 shadow-sm">
         <div className="card-body space-y-4">
           <div className="flex items-start justify-between gap-3">

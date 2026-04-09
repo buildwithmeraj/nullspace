@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import CreatePost from "@/components/feed/CreatePost";
 import Posts from "@/components/feed/Posts";
 import Link from "next/link";
@@ -11,6 +11,7 @@ import SuggestedUsers from "@/components/feed/SuggestedUsers";
 export default function HomeClient() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [composerMounted, setComposerMounted] = useState(false);
   const { user, loading, logout } = useAuth();
 
   const username = useMemo(
@@ -20,6 +21,18 @@ export default function HomeClient() {
   const name = useMemo(() => String(user?.name ?? "").trim(), [user?.name]);
   const image = useMemo(() => String(user?.image ?? "").trim(), [user?.image]);
   const needsUsername = Boolean(user) && !username;
+
+  const toggleComposer = useCallback(() => {
+    setComposerMounted(true);
+    setComposerOpen((value) => !value);
+  }, []);
+
+  const handlePostCreated = useCallback(() => {
+    setRefreshKey((value) => value + 1);
+    setComposerOpen(false);
+  }, []);
+
+  const composerVisible = composerOpen || composerMounted;
 
   return (
     <div className="grid grid-cols-12 gap-4">
@@ -108,7 +121,7 @@ export default function HomeClient() {
                   <button
                     type="button"
                     className="btn btn-sm btn-primary w-full gap-2"
-                    onClick={() => setComposerOpen((v) => !v)}
+                    onClick={() => toggleComposer()}
                   >
                     <PlusSquare className="h-4 w-4" />
                     {composerOpen ? "Close composer" : "Create post"}
@@ -158,20 +171,24 @@ export default function HomeClient() {
             <button
               type="button"
               className="btn btn-primary w-full"
-              onClick={() => setComposerOpen((v) => !v)}
+              onClick={() => toggleComposer()}
             >
               {composerOpen ? "Close composer" : "Create post"}
             </button>
           )}
         </div>
 
-        {composerOpen ? (
-          <CreatePost
-            onCreated={() => {
-              setRefreshKey((v) => v + 1);
-              setComposerOpen(false);
-            }}
-          />
+        {composerVisible ? (
+          <div
+            className={`overflow-hidden transition-[max-height,opacity,transform] duration-200 ease-out ${
+              composerOpen
+                ? "max-h-[2200px] opacity-100 translate-y-0"
+                : "max-h-0 opacity-0 pointer-events-none -translate-y-2"
+            }`}
+            aria-hidden={!composerOpen}
+          >
+            <CreatePost onCreated={handlePostCreated} />
+          </div>
         ) : null}
         <Posts refreshKey={refreshKey} />
       </main>

@@ -146,7 +146,7 @@ export default function MarkdownContent({
         const label = String(result.language ?? explicitLang ?? "text");
 
         return (
-          <div className="my-3 rounded-md border border-base-300 bg-base-100 overflow-hidden">
+          <div className="mt-3 mb-0 rounded-md border border-base-300 bg-base-100 overflow-hidden">
             <div className="code-toolbar flex items-center justify-between gap-3 px-3 py-2 text-xs border-b border-base-300 bg-base-300">
               <span className="font-mono opacity-70">{label}</span>
               <button
@@ -197,7 +197,7 @@ export default function MarkdownContent({
           const label = String(result.language ?? "text");
 
           return (
-            <span className="block my-2 rounded-md border border-base-300 bg-base-100 overflow-hidden">
+            <span className="block mt-2 mb-0 rounded-md border border-base-300 bg-base-100 overflow-hidden">
               <span className="code-toolbar flex items-center justify-between gap-3 px-3 py-2 text-xs border-b border-base-300 bg-base-300">
                 <span className="font-mono opacity-70">{label}</span>
                 <button
