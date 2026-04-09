@@ -187,7 +187,7 @@ export default function HomeClient() {
             }`}
             aria-hidden={!composerOpen}
           >
-            <CreatePost onCreated={handlePostCreated} />
+            <CreatePost onCreated={handlePostCreated} active={composerOpen} />
           </div>
         ) : null}
         <Posts refreshKey={refreshKey} />

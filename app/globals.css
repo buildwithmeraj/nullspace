@@ -84,20 +84,35 @@
   opacity: 0.7;
 }
 
-/* Dark-mode overrides for highlight.js tokens (scoped via `data-color-mode="dark"`). */
+/* Dark-mode overrides for highlight.js tokens in both app content and editor preview. */
+[data-theme="dark"] .hljs,
 [data-color-mode="dark"] .hljs {
   background: #0d1117;
   color: #c9d1d9;
 }
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote,
 [data-color-mode="dark"] .hljs-comment,
 [data-color-mode="dark"] .hljs-quote {
   color: #8b949e;
 }
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-subst,
 [data-color-mode="dark"] .hljs-keyword,
 [data-color-mode="dark"] .hljs-selector-tag,
 [data-color-mode="dark"] .hljs-subst {
   color: #ff7b72;
 }
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-section,
+[data-theme="dark"] .hljs-attribute,
+[data-theme="dark"] .hljs-literal,
+[data-theme="dark"] .hljs-template-tag,
+[data-theme="dark"] .hljs-template-variable,
+[data-theme="dark"] .hljs-type,
+[data-theme="dark"] .hljs-addition,
 [data-color-mode="dark"] .hljs-string,
 [data-color-mode="dark"] .hljs-title,
 [data-color-mode="dark"] .hljs-section,
@@ -109,12 +124,19 @@
 [data-color-mode="dark"] .hljs-addition {
   color: #a5d6ff;
 }
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-symbol,
+[data-theme="dark"] .hljs-bullet,
+[data-theme="dark"] .hljs-link,
 [data-color-mode="dark"] .hljs-number,
 [data-color-mode="dark"] .hljs-symbol,
 [data-color-mode="dark"] .hljs-bullet,
 [data-color-mode="dark"] .hljs-link {
   color: #79c0ff;
 }
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-builtin-name,
+[data-theme="dark"] .hljs-meta,
 [data-color-mode="dark"] .hljs-built_in,
 [data-color-mode="dark"] .hljs-builtin-name,
 [data-color-mode="dark"] .hljs-meta {

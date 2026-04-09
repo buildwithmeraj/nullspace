@@ -8,7 +8,6 @@ import Link from "next/link";
 import PostInteractions from "@/components/feed/PostInteractions";
 import { FaLongArrowAltRight } from "react-icons/fa";
 import Loader from "../utilities/Loader";
-import PostOwnerActions from "@/components/feed/PostOwnerActions";
 import PostSkeleton from "@/components/feed/PostSkeleton";
 
 type PostImage = {
@@ -87,7 +86,7 @@ function toPlainExcerpt(markdown: string, maxChars: number) {
   return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
 
-const Posts = ({
+function Posts({
   refreshKey,
   variant = "feed",
   userId,
@@ -95,7 +94,7 @@ const Posts = ({
   refreshKey?: number;
   variant?: "feed" | "profile" | "user";
   userId?: string;
-}) => {
+}) {
   const [posts, setPosts] = useState<Post[]>([]);
   // "loading" is only for the initial page load. If the user is logged out we
   // should render the login placeholder instead of being stuck in a loading UI.
@@ -103,7 +102,6 @@ const Posts = ({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const { user, loading: authLoading } = useAuth();
-  const meId = String(user?.id ?? user?._id ?? "").trim();
   const username = String(user?.username ?? "").trim();
   const needsUsername = Boolean(user) && !username;
   const fetchedIdsRef = useRef<Set<string>>(new Set());
@@ -286,7 +284,7 @@ const Posts = ({
       {posts.map((post) => (
         <article
           key={post._id}
-          className="card bg-base-100 border border-base-200 shadow-sm transition-shadow hover:shadow-md"
+          className="card bg-base-100 border border-base-200 shadow-sm transition-shadow hover:shadow-md [content-visibility:auto] [contain-intrinsic-size:560px]"
         >
           <div className="card-body space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -331,22 +329,6 @@ const Posts = ({
                   <div className="text-xs opacity-60">
                     {new Date(post.createdAt).toLocaleString()}
                   </div>
-                ) : null}
-                {meId && String(post.userId ?? "") === meId ? (
-                  <PostOwnerActions
-                    postId={post._id}
-                    content={post.content}
-                    onUpdated={({ content }) =>
-                      setPosts((prev) =>
-                        prev.map((p) =>
-                          p._id === post._id ? { ...p, content } : p,
-                        ),
-                      )
-                    }
-                    onDeleted={() =>
-                      setPosts((prev) => prev.filter((p) => p._id !== post._id))
-                    }
-                  />
                 ) : null}
               </div>
             </div>
@@ -408,6 +390,6 @@ const Posts = ({
       ) : null}
     </div>
   );
-};
+}
 
-export default Posts;
+export default React.memo(Posts);

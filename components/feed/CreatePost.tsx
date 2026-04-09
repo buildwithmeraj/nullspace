@@ -17,7 +17,8 @@ import ImageLightbox from "@/components/shared/ImageLightbox";
 import { Wand2 } from "lucide-react";
 import toast from "react-hot-toast";
 
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
+const loadMDEditor = () => import("@uiw/react-md-editor");
+const MDEditor = dynamic(loadMDEditor, { ssr: false });
 
 type CreatePostResult = {
   success?: boolean;
@@ -43,6 +44,14 @@ type PreviewImage = {
   file: File;
   url: string;
 };
+type IdleWindow = Window &
+  typeof globalThis & {
+    requestIdleCallback?: (
+      callback: IdleRequestCallback,
+      options?: IdleRequestOptions,
+    ) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
 
 function getMentionMatch(text: string, caret: number) {
   const before = text.slice(0, caret);
@@ -54,7 +63,13 @@ function getMentionMatch(text: string, caret: number) {
   return { query, start, end: caret };
 }
 
-const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
+const CreatePost = ({
+  onCreated,
+  active = true,
+}: {
+  onCreated?: () => void;
+  active?: boolean;
+}) => {
   const { user, loading } = useAuth();
   const { resolvedTheme } = useTheme();
   const [content, setContent] = useState<string>("");
@@ -100,6 +115,24 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const needsUsername = Boolean(user) && !username;
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
   const imageFiles = previewImages.map((image) => image.file);
+
+  useEffect(() => {
+    if (!active) return;
+    if (typeof window === "undefined") return;
+    const browserWindow = window as IdleWindow;
+
+    const preload = () => {
+      void loadMDEditor();
+    };
+
+    if (browserWindow.requestIdleCallback && browserWindow.cancelIdleCallback) {
+      const idleId = browserWindow.requestIdleCallback(preload);
+      return () => browserWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = browserWindow.setTimeout(preload, 300);
+    return () => browserWindow.clearTimeout(timeoutId);
+  }, [active]);
 
   useEffect(() => {
     if (!mention?.query || !mentionOpen) return;
@@ -403,20 +436,22 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
               <ErrorMsg message={<span className="text-sm">{error}</span>} />
             ) : null}
 
-            <div data-color-mode={colorMode}>
-              <MDEditor
-                value={content}
-                onChange={(v) => setContent(v ?? "")}
-                height={260}
-                preview="edit"
-                previewOptions={previewOptions}
-                textareaProps={{
-                  placeholder: "Write your post in Markdown…",
-                  onKeyUp: handleTextareaKeyUp,
-                  onKeyDown: handleTextareaKeyDown,
-                }}
-              />
-            </div>
+            {active ? (
+              <div data-color-mode={colorMode}>
+                <MDEditor
+                  value={content}
+                  onChange={(v) => setContent(v ?? "")}
+                  height={260}
+                  preview="edit"
+                  previewOptions={previewOptions}
+                  textareaProps={{
+                    placeholder: "Write your post in Markdown…",
+                    onKeyUp: handleTextareaKeyUp,
+                    onKeyDown: handleTextareaKeyDown,
+                  }}
+                />
+              </div>
+            ) : null}
 
             {mentionOpen && mention?.query ? (
               <div className="border border-base-300 rounded-md bg-base-100">

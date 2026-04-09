@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 
@@ -49,7 +48,6 @@ export default function PostDetail({
   postId: string;
 }) {
   const { user, loading: authLoading } = useAuth();
-  const { resolvedTheme } = useTheme();
   const router = useRouter();
 
   const [post, setPost] = useState<Post | null>(null);
@@ -57,7 +55,6 @@ export default function PostDetail({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const colorMode = resolvedTheme === "dark" ? "dark" : "light";
 
   useEffect(() => {
     let cancelled = false;
@@ -206,7 +203,7 @@ export default function PostDetail({
             </div>
           </div>
 
-          <MarkdownContent source={post.content} colorMode={colorMode} />
+          <MarkdownContent source={post.content} />
 
           {post.images?.length ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import toast from "react-hot-toast";
 
 import { protectedApiRequest } from "@/lib/api";
@@ -83,7 +82,7 @@ function formatCommentDate(value?: string) {
   return `${time.toLowerCase()}, ${day}`;
 }
 
-export default function PostInteractions({
+function PostInteractions({
   postId,
   defaultCommentsOpen = false,
 }: {
@@ -91,9 +90,7 @@ export default function PostInteractions({
   defaultCommentsOpen?: boolean;
 }) {
   const { user, loading: authLoading } = useAuth();
-  const { resolvedTheme } = useTheme();
-  const colorMode: "dark" | "light" =
-    resolvedTheme === "dark" ? "dark" : "light";
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const [reaction, setReaction] = useState<ReactionSummary>({
     reactionId: null,
@@ -108,6 +105,7 @@ export default function PostInteractions({
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [isVisible, setIsVisible] = useState(defaultCommentsOpen);
 
   const commentsCount = useMemo(() => comments.length, [comments.length]);
 
@@ -139,7 +137,27 @@ export default function PostInteractions({
   };
 
   useEffect(() => {
+    if (isVisible) return;
+    const root = rootRef.current;
+    if (!root) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { root: null, rootMargin: "220px", threshold: 0 },
+    );
+
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [isVisible]);
+
+  useEffect(() => {
     let cancelled = false;
+    if (!isVisible) return;
     if (authLoading) return;
     if (!user) return;
 
@@ -161,10 +179,11 @@ export default function PostInteractions({
     return () => {
       cancelled = true;
     };
-  }, [authLoading, postId, user]);
+  }, [authLoading, isVisible, postId, user]);
 
   useEffect(() => {
     if (authLoading || !user || !defaultCommentsOpen) return;
+    setIsVisible(true);
     setCommentsOpen(true);
     void fetchComments({ silent: true });
     // We only want the latest auth/post context to trigger a refresh.
@@ -252,7 +271,7 @@ export default function PostInteractions({
   };
 
   return (
-    <div className="pt-2 space-y-3 -mb-4">
+    <div ref={rootRef} className="pt-2 space-y-3 -mb-4">
       <div className="flex items-center gap-4">
         <button
           type="button"
@@ -325,6 +344,9 @@ export default function PostInteractions({
               {comments.map((c) => {
                 const u = c.user;
                 const uname = String(u?.username ?? "").trim();
+                const text = String(c.content ?? "");
+                const looksLikeMarkdown =
+                  /[`*_#[\]()!>|~]/.test(text) || text.includes("\n");
                 return (
                   <div key={c._id} className="flex gap-3">
                     <div className="avatar">
@@ -364,10 +386,13 @@ export default function PostInteractions({
                         </div>
                       ) : null}
                       <div className="text-sm">
-                        <MarkdownContent
-                          source={c.content}
-                          colorMode={colorMode}
-                        />
+                        {looksLikeMarkdown ? (
+                          <MarkdownContent source={text} />
+                        ) : (
+                          <div className="whitespace-pre-wrap break-words">
+                            {text}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -382,3 +407,5 @@ export default function PostInteractions({
     </div>
   );
 }
+
+export default React.memo(PostInteractions);

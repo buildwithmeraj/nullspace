@@ -82,25 +82,56 @@ function preserveSoftBreaksOutsideFences(markdown: string) {
   return out.join("\n");
 }
 
-export default function MarkdownContent({
-  source,
-  colorMode,
-}: {
-  source: string;
-  colorMode: "dark" | "light";
-}) {
-  function getDefaultExport(value: unknown): unknown {
-    if (typeof value === "function") return value;
-    if (typeof value === "object" && value !== null && "default" in value) {
-      return (value as { default: unknown }).default;
-    }
-    return value;
+function getDefaultExport(value: unknown): unknown {
+  if (typeof value === "function") return value;
+  if (typeof value === "object" && value !== null && "default" in value) {
+    return (value as { default: unknown }).default;
+  }
+  return value;
+}
+
+type Highlighted = { value: string; language: string };
+const highlightCache = new Map<string, Highlighted>();
+const MAX_HIGHLIGHT_CACHE_SIZE = 400;
+
+function highlightCached(raw: string, explicitLang?: string): Highlighted {
+  const lang = explicitLang?.toLowerCase() ?? "";
+  const key = `${lang}::${raw}`;
+  const cached = highlightCache.get(key);
+  if (cached) return cached;
+
+  const result =
+    lang && hljs.getLanguage(lang)
+      ? hljs.highlight(raw, { language: lang })
+      : hljs.highlightAuto(raw);
+
+  const next = {
+    value: result.value,
+    language: String(result.language ?? lang ?? "text"),
+  };
+  highlightCache.set(key, next);
+
+  if (highlightCache.size > MAX_HIGHLIGHT_CACHE_SIZE) {
+    const firstKey = highlightCache.keys().next().value as string | undefined;
+    if (firstKey) highlightCache.delete(firstKey);
   }
 
-  // Some builds expose it as `default` (CJS/ESM interop). Normalize it.
-  const remarkBreaks = getDefaultExport(remarkBreaksImport) as Pluggable;
-  const remarkPlugins: PluggableList = [remarkGfm, remarkBreaks];
-  const normalizedSource = preserveSoftBreaksOutsideFences(source);
+  return next;
+}
+
+const remarkBreaks = getDefaultExport(remarkBreaksImport) as Pluggable;
+const remarkPlugins: PluggableList = [remarkGfm, remarkBreaks];
+
+function MarkdownContentImpl({
+  source,
+}: {
+  source: string;
+  colorMode?: "dark" | "light";
+}) {
+  const normalizedSource = useMemo(
+    () => preserveSoftBreaksOutsideFences(source),
+    [source],
+  );
 
   const components = useMemo(
     () => ({
@@ -139,11 +170,8 @@ export default function MarkdownContent({
 
         const match = /language-([a-z0-9_-]+)/i.exec(codeClassName);
         const explicitLang = match?.[1]?.toLowerCase();
-        const result =
-          explicitLang && hljs.getLanguage(explicitLang)
-            ? hljs.highlight(raw, { language: explicitLang })
-            : hljs.highlightAuto(raw);
-        const label = String(result.language ?? explicitLang ?? "text");
+        const result = highlightCached(raw, explicitLang);
+        const label = result.language;
 
         return (
           <div className="mt-3 mb-0 rounded-md border border-base-300 bg-base-100 overflow-hidden">
@@ -193,8 +221,8 @@ export default function MarkdownContent({
           if (!shouldHighlight)
             return <code className={className}>{children}</code>;
 
-          const result = hljs.highlightAuto(text);
-          const label = String(result.language ?? "text");
+          const result = highlightCached(text);
+          const label = result.language;
 
           return (
             <span className="block mt-2 mb-0 rounded-md border border-base-300 bg-base-100 overflow-hidden">
@@ -223,13 +251,17 @@ export default function MarkdownContent({
   );
 
   return (
-    <div
-      data-color-mode={colorMode}
-      className="wmde-markdown rounded-xl !bg-transparent !p-0"
-    >
+    <div className="wmde-markdown rounded-xl !bg-transparent !p-0">
       <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
         {normalizedSource}
       </ReactMarkdown>
     </div>
   );
 }
+
+const MarkdownContent = React.memo(
+  MarkdownContentImpl,
+  (prev, next) => prev.source === next.source,
+);
+
+export default MarkdownContent;

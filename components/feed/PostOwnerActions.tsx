@@ -9,11 +9,20 @@ import { useTheme } from "next-themes";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
-const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
+const loadMDEditor = () => import("@uiw/react-md-editor");
+const MDEditor = dynamic(loadMDEditor, { ssr: false });
+type IdleWindow = Window &
+  typeof globalThis & {
+    requestIdleCallback?: (
+      callback: IdleRequestCallback,
+      options?: IdleRequestOptions,
+    ) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
 
 type UpdateResponse<T> = { success?: boolean; message?: string; data?: T };
 
-export default function PostOwnerActions({
+function PostOwnerActions({
   postId,
   content,
   onUpdated,
@@ -31,6 +40,7 @@ export default function PostOwnerActions({
   const [draft, setDraft] = useState(content);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const dirty = useMemo(() => draft.trim() !== String(content ?? "").trim(), [content, draft]);
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
@@ -46,8 +56,27 @@ export default function PostOwnerActions({
     };
   }, []);
 
+  React.useEffect(() => {
+    if (!editOpen) return;
+    if (typeof window === "undefined") return;
+    const browserWindow = window as IdleWindow;
+
+    const preload = () => {
+      void loadMDEditor();
+    };
+
+    if (browserWindow.requestIdleCallback && browserWindow.cancelIdleCallback) {
+      const idleId = browserWindow.requestIdleCallback(preload);
+      return () => browserWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = browserWindow.setTimeout(preload, 300);
+    return () => browserWindow.clearTimeout(timeoutId);
+  }, [editOpen]);
+
   const openEdit = () => {
     setDraft(content);
+    setEditOpen(true);
     editDialogRef.current?.showModal();
   };
 
@@ -55,7 +84,10 @@ export default function PostOwnerActions({
     deleteDialogRef.current?.showModal();
   };
 
-  const closeEdit = () => editDialogRef.current?.close();
+  const closeEdit = () => {
+    setEditOpen(false);
+    editDialogRef.current?.close();
+  };
   const closeDelete = () => deleteDialogRef.current?.close();
 
   const save = async () => {
@@ -124,23 +156,29 @@ export default function PostOwnerActions({
         </ul>
       </div>
 
-      <dialog ref={editDialogRef} className="modal">
+      <dialog
+        ref={editDialogRef}
+        className="modal"
+        onClose={() => setEditOpen(false)}
+      >
         <div className="modal-box">
           <h3 className="font-semibold text-lg">Edit post</h3>
           <p className="text-sm opacity-70 mt-1">Update your post content.</p>
 
           <div className="mt-4 space-y-2">
-            <div data-color-mode={colorMode}>
-              <MDEditor
-                value={draft}
-                onChange={(v) => setDraft(v ?? "")}
-                height={260}
-                previewOptions={previewOptions}
-                textareaProps={{
-                  placeholder: "Update your post in Markdown…",
-                }}
-              />
-            </div>
+            {editOpen ? (
+              <div data-color-mode={colorMode}>
+                <MDEditor
+                  value={draft}
+                  onChange={(v) => setDraft(v ?? "")}
+                  height={260}
+                  previewOptions={previewOptions}
+                  textareaProps={{
+                    placeholder: "Update your post in Markdown…",
+                  }}
+                />
+              </div>
+            ) : null}
             <div className="text-xs opacity-60 flex items-center justify-between">
               <span>{dirty ? "Unsaved changes" : "No changes"}</span>
               <span>{draft.length}/10000</span>
@@ -183,3 +221,5 @@ export default function PostOwnerActions({
     </>
   );
 }
+
+export default React.memo(PostOwnerActions);
