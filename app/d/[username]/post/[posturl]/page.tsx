@@ -1,5 +1,5 @@
-import PostDetail from "@/components/feed/PostDetail";
 import type { Metadata } from "next";
+import PostRoute from "@/components/pages/developer/PostRoute";
 
 export async function generateMetadata({
   params,
@@ -18,6 +18,5 @@ export default async function PostPage({
 }: {
   params: Promise<{ username: string; posturl: string }>;
 }) {
-  const { username, posturl } = await params;
-  return <PostDetail username={username} postId={posturl} />;
+  return <PostRoute params={params} />;
 }

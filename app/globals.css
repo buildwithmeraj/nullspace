@@ -29,6 +29,17 @@
 }
 
 /* Improve code block rendering in previews. */
+.wmde-markdown {
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+}
+
+[data-color-mode="dark"] .wmde-markdown,
+[data-color-mode="light"] .wmde-markdown {
+  background-color: transparent !important;
+}
+
 .wmde-markdown pre {
   /* Wrap long lines to avoid horizontal scrolling in the feed/post views. */
   white-space: pre-wrap;

@@ -33,7 +33,13 @@ export default function HomeClient() {
                   <div className="w-14 rounded-full ring ring-base-100 ring-offset-2 ring-offset-base-100 bg-base-300">
                     {image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt="Profile" className="object-cover" />
+                      <img
+                        src={image}
+                        alt="Profile"
+                        className="object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : null}
                   </div>
                 </div>
@@ -57,12 +63,15 @@ export default function HomeClient() {
               <div className="flex flex-wrap items-center gap-2">
                 {user ? (
                   <>
-                    <Link className="btn btn-sm btn-outline" href="/profile">
+                    <Link
+                      className="btn btn-sm btn-soft btn-info"
+                      href="/profile"
+                    >
                       View profile
                     </Link>
                     <button
                       type="button"
-                      className="btn btn-sm btn-neutral"
+                      className="btn btn-sm btn-error btn-soft"
                       onClick={() => void logout()}
                       disabled={loading}
                     >
@@ -108,9 +117,22 @@ export default function HomeClient() {
 
                 <div className="divider my-1" />
                 <ul className="text-sm opacity-80 space-y-1">
-                  <li>My posts</li>
-                  <li>Friends</li>
-                  <li>Saved</li>
+                  <li>
+                    <Link
+                      className="link link-hover"
+                      href={user ? "/profile#posts" : "/login?next=%2Fprofile%23posts"}
+                    >
+                      My posts
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      className="link link-hover"
+                      href={user ? "/profile#friends" : "/login?next=%2Fprofile%23friends"}
+                    >
+                      Friends
+                    </Link>
+                  </li>
                 </ul>
               </div>
             </div>

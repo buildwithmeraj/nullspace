@@ -32,7 +32,7 @@ const ThemeSwitcher = () => {
         onChange={(e) => handleThemeChange(e.target.checked)}
         aria-label="Toggle theme"
       />
-      <div className="relative w-[80px] h-[36px] bg-orange-300 peer-checked:bg-zinc-500 rounded-full after:absolute after:content-[''] after:w-[28px] after:h-[28px] after:bg-gradient-to-r from-orange-500 to-yellow-400 peer-checked:after:from-zinc-900 peer-checked:after:to-zinc-900 after:rounded-full after:top-[4px] after:left-[4px] active:after:w-[32px] peer-checked:after:left-[76px] peer-checked:after:translate-x-[-100%] shadow-sm duration-300 after:duration-300 after:shadow-md" />
+      <div className="relative w-[80px] h-[36px] bg-sky-400 peer-checked:bg-zinc-500 rounded-full after:absolute after:content-[''] after:w-[28px] after:h-[28px] after:bg-gradient-to-r after:from-orange-300 after:to-orange-300 peer-checked:after:from-zinc-900 peer-checked:after:to-zinc-900 after:rounded-full after:top-[4px] after:left-[4px] active:after:w-[32px] peer-checked:after:left-[76px] peer-checked:after:translate-x-[-100%] shadow-sm duration-300 after:duration-300 after:shadow-md" />
       <svg
         height={0}
         width={100}
@@ -40,7 +40,7 @@ const ThemeSwitcher = () => {
         data-name="Layer 1"
         id="Layer_1"
         xmlns="http://www.w3.org/2000/svg"
-        className="fill-black peer-checked:opacity-60 peer-checked:fill-white absolute w-4 h-4 left-[9px]"
+        className="fill-white peer-checked:opacity-60 peer-checked:fill-white absolute w-4 h-4 left-[9px]"
       >
         <path d="M12,17c-2.76,0-5-2.24-5-5s2.24-5,5-5,5,2.24,5,5-2.24,5-5,5ZM13,0h-2V5h2V0Zm0,19h-2v5h2v-5ZM5,11H0v2H5v-2Zm19,0h-5v2h5v-2Zm-2.81-6.78l-1.41-1.41-3.54,3.54,1.41,1.41,3.54-3.54ZM7.76,17.66l-1.41-1.41-3.54,3.54,1.41,1.41,3.54-3.54Zm0-11.31l-3.54-3.54-1.41,1.41,3.54,3.54,1.41-1.41Zm13.44,13.44l-3.54-3.54-1.41,1.41,3.54,3.54,1.41-1.41Z" />
       </svg>

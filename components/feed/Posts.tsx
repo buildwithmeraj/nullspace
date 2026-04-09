@@ -9,6 +9,7 @@ import PostInteractions from "@/components/feed/PostInteractions";
 import { FaLongArrowAltRight } from "react-icons/fa";
 import Loader from "../utilities/Loader";
 import PostOwnerActions from "@/components/feed/PostOwnerActions";
+import PostSkeleton from "@/components/feed/PostSkeleton";
 
 type PostImage = {
   url: string;
@@ -37,38 +38,15 @@ type FeedResponse = {
   data?: { posts?: Post[]; hasMore?: boolean };
 };
 
+type PostsResponse = { success?: boolean; message?: string; data?: Post[] };
+
 const PAGE_SIZE = 15;
 
 function FeedSkeleton() {
   return (
     <div className="space-y-4">
       {Array.from({ length: 3 }).map((_, idx) => (
-        <div
-          key={idx}
-          className="card bg-base-100 border border-base-200 shadow-sm"
-        >
-          <div className="card-body space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className="skeleton w-10 h-10 rounded-full" />
-                <div className="space-y-2">
-                  <div className="skeleton h-4 w-36" />
-                  <div className="skeleton h-3 w-24" />
-                </div>
-              </div>
-              <div className="skeleton h-3 w-24" />
-            </div>
-            <div className="space-y-2">
-              <div className="skeleton h-3 w-full" />
-              <div className="skeleton h-3 w-5/6" />
-              <div className="skeleton h-3 w-2/3" />
-            </div>
-            <div className="flex gap-2">
-              <div className="skeleton h-8 w-24 rounded-btn" />
-              <div className="skeleton h-8 w-28 rounded-btn" />
-            </div>
-          </div>
-        </div>
+        <PostSkeleton key={idx} />
       ))}
     </div>
   );
@@ -109,7 +87,15 @@ function toPlainExcerpt(markdown: string, maxChars: number) {
   return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
 }
 
-const Posts = ({ refreshKey }: { refreshKey?: number }) => {
+const Posts = ({
+  refreshKey,
+  variant = "feed",
+  userId,
+}: {
+  refreshKey?: number;
+  variant?: "feed" | "profile" | "user";
+  userId?: string;
+}) => {
   const [posts, setPosts] = useState<Post[]>([]);
   // "loading" is only for the initial page load. If the user is logged out we
   // should render the login placeholder instead of being stuck in a loading UI.
@@ -124,13 +110,17 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
   const initKeyRef = useRef<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const EXCERPT_CHARS = 420;
+  const isProfile = variant === "profile";
+  const isUserList = variant === "user";
+  const isFiniteList = isProfile || isUserList;
 
   const loadMore = useCallback(
     async (reset = false) => {
       if (authLoading) return;
       if (!user) return;
       if (needsUsername) return;
-      if (!hasMore && !reset) return;
+      if (isUserList && !String(userId ?? "").trim()) return;
+      if (!isFiniteList && !hasMore && !reset) return;
       if (loadingMore) return;
 
       if (reset) setLoading(true);
@@ -142,15 +132,33 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
           setHasMore(true);
         }
 
-        const excludeIds = Array.from(fetchedIdsRef.current);
-        const res = await protectedApiRequest<FeedResponse>({
-          url: "/posts/feed",
-          method: "POST",
-          data: { limit: PAGE_SIZE, excludeIds },
-        });
+        let nextPosts: Post[] = [];
+        let nextHasMore = false;
 
-        const nextPosts = res?.data?.posts ?? [];
-        const nextHasMore = Boolean(res?.data?.hasMore);
+        if (isProfile) {
+          const res = await protectedApiRequest<PostsResponse>({
+            url: "/posts",
+            method: "GET",
+          });
+          nextPosts = res?.data ?? [];
+        } else if (isUserList) {
+          const res = await protectedApiRequest<PostsResponse>({
+            url: `/posts/user/${encodeURIComponent(String(userId ?? "").trim())}`,
+            method: "GET",
+          });
+          nextPosts = res?.data ?? [];
+        } else {
+          const res = await protectedApiRequest<FeedResponse>({
+            url: "/posts/feed",
+            method: "POST",
+            data: {
+              limit: PAGE_SIZE,
+              excludeIds: Array.from(fetchedIdsRef.current),
+            },
+          });
+          nextPosts = res?.data?.posts ?? [];
+          nextHasMore = Boolean(res?.data?.hasMore);
+        }
 
         const unique = nextPosts.filter(
           (p) => !fetchedIdsRef.current.has(p._id),
@@ -158,7 +166,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
         unique.forEach((p) => fetchedIdsRef.current.add(p._id));
 
         setPosts((prev) => (reset ? unique : [...prev, ...unique]));
-        setHasMore(nextHasMore);
+        setHasMore(isFiniteList ? false : nextHasMore);
       } catch (e) {
         console.error("Failed to fetch feed:", e);
         setHasMore(false);
@@ -167,7 +175,17 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
         setLoadingMore(false);
       }
     },
-    [authLoading, hasMore, loadingMore, needsUsername, user],
+    [
+      authLoading,
+      hasMore,
+      isFiniteList,
+      isProfile,
+      isUserList,
+      loadingMore,
+      needsUsername,
+      user,
+      userId,
+    ],
   );
 
   useEffect(() => {
@@ -178,16 +196,17 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
     if (needsUsername) return;
 
     const uid = String(user.id ?? user._id ?? "");
-    const key = `${uid}:${String(refreshKey ?? 0)}`;
+    const key = `${uid}:${String(refreshKey ?? 0)}:${variant}:${String(userId ?? "")}`;
     if (initKeyRef.current === key) return;
     initKeyRef.current = key;
 
     void loadMore(true);
-  }, [authLoading, loadMore, needsUsername, refreshKey, user]);
+  }, [authLoading, loadMore, needsUsername, refreshKey, user, userId, variant]);
 
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
+    if (isFiniteList) return;
     if (authLoading || !user || needsUsername) return;
 
     const obs = new IntersectionObserver(
@@ -201,7 +220,7 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
     obs.observe(el);
     return () => obs.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, needsUsername, user, hasMore]);
+  }, [authLoading, hasMore, isFiniteList, needsUsername, user]);
 
   if (authLoading) return <Loader label="Loading session…" />;
   if (loading) return <FeedSkeleton />;
@@ -252,7 +271,15 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
     );
 
   if (!posts.length)
-    return <div className="opacity-70 text-sm">No posts yet.</div>;
+    return (
+      <div className="opacity-70 text-sm">
+        {isProfile
+          ? "You haven't posted yet."
+          : isUserList
+            ? "No posts from this developer yet."
+            : "No posts yet."}
+      </div>
+    );
 
   return (
     <div className="space-y-4">
@@ -272,6 +299,8 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                         src={String(post.user.image ?? "")}
                         alt="Author"
                         className="object-cover"
+                        loading="lazy"
+                        decoding="async"
                       />
                     ) : null}
                   </div>
@@ -355,21 +384,27 @@ const Posts = ({ refreshKey }: { refreshKey?: number }) => {
                     src={img.url}
                     alt="Post image"
                     className="rounded-md object-cover w-full h-40"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ))}
               </div>
             ) : null}
-
+            <div className="divider -my-4"></div>
             <PostInteractions postId={post._id} />
           </div>
         </article>
       ))}
 
-      <div ref={sentinelRef} />
-      {loadingMore ? (
-        <Loader label="Loading more…" />
-      ) : !hasMore ? (
-        <div className="opacity-70 text-sm">No more posts.</div>
+      {!isFiniteList ? <div ref={sentinelRef} /> : null}
+      {!isFiniteList ? (
+        loadingMore ? (
+          <Loader label="Loading more…" />
+        ) : !hasMore ? (
+          <div className="opacity-50 text-sm divider py-6">
+            <i>No more posts to show</i>
+          </div>
+        ) : null
       ) : null}
     </div>
   );

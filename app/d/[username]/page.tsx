@@ -1,5 +1,5 @@
-import DeveloperProfile from "@/components/developer/DeveloperProfile";
 import type { Metadata } from "next";
+import DeveloperProfileRoute from "@/components/pages/developer/DeveloperProfileRoute";
 
 export async function generateMetadata({
   params,
@@ -18,6 +18,5 @@ export default async function DeveloperProfilePage({
 }: {
   params: Promise<{ username: string }>;
 }) {
-  const { username } = await params;
-  return <DeveloperProfile username={username} />;
+  return <DeveloperProfileRoute params={params} />;
 }

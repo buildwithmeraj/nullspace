@@ -1,6 +1,5 @@
-import { Suspense } from "react";
-import AuthCallbackClient from "./AuthCallbackClient";
 import type { Metadata } from "next";
+import AuthCallbackPageContent from "@/components/pages/auth/AuthCallbackPageContent";
 
 export const metadata: Metadata = {
   title: "Authenticating",
@@ -8,9 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AuthCallbackPage() {
-  return (
-    <Suspense fallback={<p>Logging you in...</p>}>
-      <AuthCallbackClient />
-    </Suspense>
-  );
+  return <AuthCallbackPageContent />;
 }

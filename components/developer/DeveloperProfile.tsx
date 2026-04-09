@@ -10,9 +10,8 @@ import SuccessMsg from "@/components/utilities/Success";
 import RequireLogin from "@/components/auth/RequireLogin";
 import Loader from "@/components/utilities/Loader";
 import LoaderBlock from "@/components/utilities/LoaderBlock";
-import { FaLongArrowAltRight } from "react-icons/fa";
-import PostOwnerActions from "@/components/feed/PostOwnerActions";
 import NotFoundState from "@/components/shared/NotFoundState";
+import Posts from "@/components/feed/Posts";
 
 type PublicUser = {
   _id: string;
@@ -34,42 +33,6 @@ type Friend = {
 
 type ApiResponse<T> = { success?: boolean; message?: string; data?: T };
 
-type PostImage = {
-  url: string;
-  publicId?: string;
-  width?: number;
-  height?: number;
-};
-type Post = {
-  _id: string;
-  content: string;
-  images?: PostImage[];
-  createdAt?: string;
-  userId?: string;
-  user?: PublicUser | null;
-};
-type PostsResponse = { success?: boolean; message?: string; data?: Post[] };
-
-function toPlainExcerpt(markdown: string, maxChars: number) {
-  const input = String(markdown ?? "");
-  let text = input
-    .replace(/```[\s\S]*?```/g, " [code block] ")
-    .replace(/~~~[\s\S]*?~~~/g, " [code block] ");
-  text = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1");
-  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-  text = text.replace(/`([^`]+)`/g, "$1");
-  text = text
-    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
-    .replace(/^\s{0,3}>\s?/gm, "")
-    .replace(/^\s{0,3}([-*+])\s+/gm, "")
-    .replace(/^\s{0,3}\d+\.\s+/gm, "");
-  text = text.replace(/[*_~]/g, "");
-  text = text.replace(/\s+/g, " ").trim();
-  if (!text) return "";
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`;
-}
-
 export default function DeveloperProfile({ username }: { username: string }) {
   const { user, loading } = useAuth();
   const [dev, setDev] = useState<PublicUser | null>(null);
@@ -78,8 +41,6 @@ export default function DeveloperProfile({ username }: { username: string }) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [postsLoading, setPostsLoading] = useState(false);
 
   const meId = useMemo(() => {
     if (!user) return null;
@@ -119,7 +80,6 @@ export default function DeveloperProfile({ username }: { username: string }) {
     setDev(null);
     setRelationship(null);
     setNotFound(false);
-    setPosts([]);
 
     (async () => {
       if (loading) return;
@@ -146,15 +106,6 @@ export default function DeveloperProfile({ username }: { username: string }) {
         if (cancelled) return;
         setDev(nextDev);
         setRelationship(nextRel);
-
-        // Load the developer's posts (public in-app, but still auth-protected).
-        setPostsLoading(true);
-        const postsRes = await protectedApiRequest<PostsResponse>({
-          url: `/posts/user/${encodeURIComponent(String(nextDev._id))}`,
-          method: "GET",
-        }).catch(() => null);
-        if (!cancelled) setPosts(postsRes?.data ?? []);
-        if (!cancelled) setPostsLoading(false);
       } catch (e) {
         if (!cancelled)
           setError(e instanceof Error ? e.message : "Failed to load profile");
@@ -278,7 +229,7 @@ export default function DeveloperProfile({ username }: { username: string }) {
     String(relationship?.recipientId ?? "") === String(meId ?? "");
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-3 sm:px-4 py-6 space-y-4">
+    <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-6 space-y-4">
       {info ? (
         <SuccessMsg message={<span className="text-sm">{info}</span>} />
       ) : null}
@@ -296,6 +247,8 @@ export default function DeveloperProfile({ username }: { username: string }) {
                       src={displayImage}
                       alt="Developer"
                       className="object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : null}
                 </div>
@@ -318,11 +271,6 @@ export default function DeveloperProfile({ username }: { username: string }) {
                   {memberSince ? (
                     <span className="badge badge-ghost">
                       Member since {new Date(memberSince).toLocaleDateString()}
-                    </span>
-                  ) : null}
-                  {posts.length ? (
-                    <span className="badge badge-outline">
-                      {posts.length} posts
                     </span>
                   ) : null}
                 </div>
@@ -373,79 +321,11 @@ export default function DeveloperProfile({ username }: { username: string }) {
         </div>
       </section>
 
-      <section className="card bg-base-100 border border-base-200 shadow-sm">
-        <div className="card-body space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="card-title text-base">Posts</h2>
-            <div className="text-xs opacity-60">
-              {posts.length ? `${posts.length} total` : null}
-            </div>
-          </div>
-
-          {postsLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 2 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-md border border-base-200 p-3"
-                >
-                  <div className="space-y-2">
-                    <div className="skeleton h-3 w-full" />
-                    <div className="skeleton h-3 w-5/6" />
-                    <div className="skeleton h-3 w-2/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : posts.length ? (
-            <div className="space-y-3">
-            {posts.slice(0, 10).map((p) => {
-              const uname = String(dev.username ?? "").trim();
-              const href = uname
-                ? `/d/${encodeURIComponent(uname)}/post/${encodeURIComponent(p._id)}`
-                : `/d/unknown/post/${encodeURIComponent(p._id)}`;
-              return (
-                <div
-                  key={p._id}
-                  className="rounded-md border border-base-200 p-3 hover:bg-base-200/40 transition-colors"
-                >
-                  <p className="text-sm whitespace-pre-wrap break-words">
-                    {toPlainExcerpt(p.content, 420)}
-                  </p>
-                  <div className="pt-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Link className="btn btn-xs btn-ghost gap-2" href={href}>
-                        View full post <FaLongArrowAltRight />
-                      </Link>
-                      {isMe ? (
-                        <PostOwnerActions
-                          postId={p._id}
-                          content={p.content}
-                          onUpdated={({ content }) =>
-                            setPosts((prev) =>
-                              prev.map((x) => (x._id === p._id ? { ...x, content } : x)),
-                            )
-                          }
-                          onDeleted={() =>
-                            setPosts((prev) => prev.filter((x) => x._id !== p._id))
-                          }
-                        />
-                      ) : null}
-                    </div>
-                    {p.createdAt ? (
-                      <span className="text-xs opacity-60">
-                        {new Date(p.createdAt).toLocaleDateString()}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-            </div>
-          ) : (
-            <div className="text-sm opacity-70">No posts yet.</div>
-          )}
+      <section className="">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-bold text-2xl mb-4">Posts</h2>
         </div>
+        <Posts variant="user" userId={String(dev._id)} />
       </section>
     </div>
   );

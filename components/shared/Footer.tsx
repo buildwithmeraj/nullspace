@@ -5,7 +5,7 @@ import Logo from "@/components/utilities/Logo";
 const Footer = () => {
   return (
     <footer className="border-t border-base-200 bg-base-100">
-      <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-10 flex flex-col sm:flex-row gap-8 items-start sm:items-center justify-between">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 flex flex-col sm:flex-row gap-8 items-start sm:items-center justify-between">
         <div className="space-y-2">
           <div className="text-xl font-semibold">
             <Logo />

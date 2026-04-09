@@ -5,6 +5,8 @@ import toast from "react-hot-toast";
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import InfoMsg from "@/components/utilities/Info";
+import ErrorMsg from "@/components/utilities/Error";
+import SuccessMsg from "@/components/utilities/Success";
 import { useSearchParams } from "next/navigation";
 import RequireLogin from "@/components/auth/RequireLogin";
 
@@ -12,6 +14,17 @@ type UpdateProfileResponse = {
   success?: boolean;
   message?: string;
   data?: Record<string, unknown>;
+};
+
+type UsernameAvailabilityResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    username?: string;
+    available?: boolean;
+    reason?: string;
+    suggestions?: string[];
+  };
 };
 
 type FormState = {
@@ -27,6 +40,17 @@ export default function UpdateProfile() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [usernameState, setUsernameState] = useState<{
+    checking: boolean;
+    available: boolean | null;
+    reason: string;
+    suggestions: string[];
+  }>({
+    checking: false,
+    available: null,
+    reason: "",
+    suggestions: [],
+  });
 
   const initial = useMemo<FormState>(
     () => ({
@@ -44,6 +68,94 @@ export default function UpdateProfile() {
     setForm(initial);
   }, [initial]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const raw = form.username.trim().replace(/^@/, "");
+    const normalized = raw.toLowerCase();
+    const currentUsername = String(user.username ?? "")
+      .trim()
+      .replace(/^@/, "")
+      .toLowerCase();
+
+    if (!normalized) {
+      setUsernameState({
+        checking: false,
+        available: null,
+        reason: "Choose a username to continue.",
+        suggestions: [],
+      });
+      return;
+    }
+
+    if (!/^[a-z0-9_]{3,24}$/.test(normalized)) {
+      setUsernameState({
+        checking: false,
+        available: false,
+        reason: "Use 3-24 lowercase letters, numbers, or underscores only.",
+        suggestions: [],
+      });
+      return;
+    }
+
+    if (normalized === currentUsername) {
+      setUsernameState({
+        checking: false,
+        available: true,
+        reason: "This is already your current username.",
+        suggestions: [],
+      });
+      return;
+    }
+
+    let cancelled = false;
+    setUsernameState((prev) => ({
+      ...prev,
+      checking: true,
+      reason: "Checking availability…",
+      suggestions: [],
+    }));
+
+    const handle = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await protectedApiRequest<UsernameAvailabilityResponse>({
+            url: `/users/username-availability?username=${encodeURIComponent(normalized)}`,
+            method: "GET",
+          });
+          if (cancelled) return;
+          setUsernameState({
+            checking: false,
+            available:
+              typeof res?.data?.available === "boolean"
+                ? res.data.available
+                : null,
+            reason: String(res?.data?.reason ?? ""),
+            suggestions: Array.isArray(res?.data?.suggestions)
+              ? res.data.suggestions
+              : [],
+          });
+        } catch (err) {
+          if (cancelled) return;
+          setUsernameState({
+            checking: false,
+            available: null,
+            reason:
+              err instanceof Error
+                ? err.message
+                : "Failed to check username availability.",
+            suggestions: [],
+          });
+        }
+      })();
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [form.username, user]);
+
   const uploadImage = async (file: File): Promise<string> => {
     const body = new FormData();
     body.append("image", file);
@@ -58,9 +170,11 @@ export default function UpdateProfile() {
       credentials: "include",
     });
 
-    const json = (await res.json().catch(() => null)) as
-      | { success?: boolean; message?: string; data?: { url?: string } }
-      | null;
+    const json = (await res.json().catch(() => null)) as {
+      success?: boolean;
+      message?: string;
+      data?: { url?: string };
+    } | null;
 
     const url = json?.data?.url;
     if (!res.ok || !json?.success || !url) {
@@ -101,6 +215,14 @@ export default function UpdateProfile() {
         toast.error("Username is required");
         return;
       }
+      if (usernameState.checking) {
+        toast.error("Please wait until username availability is checked");
+        return;
+      }
+      if (usernameState.available === false) {
+        toast.error("Please choose an available username");
+        return;
+      }
 
       // Avatar and profile picture are merged; `image` is the canonical field.
       let nextImageUrl = String(user.image ?? "").trim();
@@ -138,7 +260,9 @@ export default function UpdateProfile() {
       });
       toast.success(res.message ?? "Profile updated");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update profile");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update profile",
+      );
     } finally {
       setUploading(false);
       setSaving(false);
@@ -167,6 +291,10 @@ export default function UpdateProfile() {
   const redirected =
     params.get("reason") === "complete_profile" || Boolean(params.get("next"));
   const needsUsername = !String(user.username ?? "").trim();
+  const normalizedUsername = form.username
+    .trim()
+    .replace(/^@/, "")
+    .toLowerCase();
 
   return (
     <section className="card bg-base-100 border border-base-200 shadow-sm">
@@ -177,7 +305,7 @@ export default function UpdateProfile() {
             Update your display info. Username must be unique.
           </p>
         </div>
-
+        <div className="divider my-1 -mt-3"></div>
         {redirected && needsUsername ? (
           <InfoMsg
             message={
@@ -190,24 +318,42 @@ export default function UpdateProfile() {
         ) : null}
 
         <form className="space-y-3" onSubmit={submit}>
-          <div className="flex items-center gap-3">
-            <div className="avatar">
-              <div className="w-12 rounded-full bg-base-200">
-                {previewUrl || user.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewUrl ?? String(user.image ?? "")}
-                    alt="Profile"
-                    className="object-cover"
-                  />
-                ) : null}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center gap-3">
+              <div className="avatar">
+                <div className="w-12 rounded-full bg-base-200">
+                  {previewUrl || user.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={previewUrl ?? String(user.image ?? "")}
+                      alt="Profile"
+                      className="object-cover"
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <div className="text-sm">
+                <div className="font-medium">Profile picture</div>
+                <div className="opacity-70">
+                  Upload a square image for best results.
+                </div>
               </div>
             </div>
-            <div className="text-sm">
-              <div className="font-medium">Profile picture</div>
-              <div className="opacity-70">
-                Upload a square image for best results.
-              </div>
+            <div className="">
+              <label className="form-control w-full">
+                <div className="label">
+                  <span className="label-text">
+                    Change Profile image (upload)
+                  </span>
+                </div>
+                <input
+                  type="file"
+                  className="file-input file-input-bordered w-full"
+                  accept="image/*"
+                  onChange={onPickImage}
+                  disabled={saving || uploading}
+                />
+              </label>
             </div>
           </div>
 
@@ -236,10 +382,62 @@ export default function UpdateProfile() {
                 value={form.username}
                 onChange={onChange}
                 disabled={saving || uploading}
+                placeholder="e.g. meraj_dev"
                 required
               />
             </label>
           </div>
+
+          {normalizedUsername ? (
+            <div className="space-y-2">
+              {usernameState.available === true ? (
+                <SuccessMsg
+                  message={
+                    <span className="text-sm">
+                      {usernameState.reason || "Username is available."}
+                    </span>
+                  }
+                />
+              ) : usernameState.available === false ? (
+                <ErrorMsg
+                  message={
+                    <span className="text-sm">
+                      {usernameState.reason || "Username is not available."}
+                    </span>
+                  }
+                />
+              ) : (
+                <InfoMsg
+                  message={
+                    <span className="text-sm">
+                      {usernameState.reason || "Checking username…"}
+                    </span>
+                  }
+                />
+              )}
+
+              {usernameState.suggestions.length ? (
+                <div className="rounded-xl alert alert-info alert-soft p-3 space-y-2">
+                  <div className="text-sm font-medium">Suggestions</div>
+                  <div className="flex flex-wrap gap-2">
+                    {usernameState.suggestions.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() =>
+                          setForm((prev) => ({ ...prev, username: suggestion }))
+                        }
+                        disabled={saving || uploading}
+                      >
+                        @{suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="form-control w-full">
             <div className="label">
@@ -255,22 +453,7 @@ export default function UpdateProfile() {
             />
           </label>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Profile image (upload)</span>
-              </div>
-              <input
-                type="file"
-                className="file-input file-input-bordered w-full"
-                accept="image/*"
-                onChange={onPickImage}
-                disabled={saving || uploading}
-              />
-            </label>
-          </div>
-
-          <div className="card-actions justify-end">
+          <div className="card-actions justify-end mt-4">
             <button
               type="submit"
               className="btn btn-neutral"

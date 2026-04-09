@@ -13,6 +13,7 @@ import { protectedApiRequest } from "@/lib/api";
 import InfoMsg from "@/components/utilities/Info";
 import ErrorMsg from "@/components/utilities/Error";
 import RequireLogin from "@/components/auth/RequireLogin";
+import ImageLightbox from "@/components/shared/ImageLightbox";
 import { Wand2 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -38,6 +39,10 @@ type MentionUser = {
   image?: string;
 };
 type SearchUsersResponse = { success?: boolean; data?: MentionUser[] };
+type PreviewImage = {
+  file: File;
+  url: string;
+};
 
 function getMentionMatch(text: string, caret: number) {
   const before = text.slice(0, caret);
@@ -62,12 +67,13 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [previewImages, setPreviewImages] = useState<PreviewImage[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const previewImagesRef = useRef<PreviewImage[]>([]);
 
   const previewOptions = useMemo(() => {
     const highlight: [
@@ -93,6 +99,7 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   const username = String(user?.username ?? "").trim();
   const needsUsername = Boolean(user) && !username;
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
+  const imageFiles = previewImages.map((image) => image.file);
 
   useEffect(() => {
     if (!mention?.query || !mentionOpen) return;
@@ -113,13 +120,14 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
   }, [mention?.query, mentionOpen]);
 
   useEffect(() => {
-    // Maintain local object URLs for selected images and clean them up.
-    const urls = imageFiles.map((f) => URL.createObjectURL(f));
-    setImagePreviews(urls);
+    previewImagesRef.current = previewImages;
+  }, [previewImages]);
+
+  useEffect(() => {
     return () => {
-      urls.forEach((u) => URL.revokeObjectURL(u));
+      previewImagesRef.current.forEach((image) => URL.revokeObjectURL(image.url));
     };
-  }, [imageFiles]);
+  }, []);
 
   const onPickImages = (files: FileList | null) => {
     setError(null);
@@ -127,15 +135,33 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
     const picked = Array.from(files);
     if (!picked.length) return;
 
-    const next = [...imageFiles, ...picked].slice(0, MAX_IMAGES);
-    if (imageFiles.length + picked.length > MAX_IMAGES) {
+    const remainingSlots = Math.max(0, MAX_IMAGES - previewImages.length);
+    const accepted = picked.slice(0, remainingSlots).map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+    }));
+
+    if (previewImages.length + picked.length > MAX_IMAGES) {
       setError(`You can upload up to ${MAX_IMAGES} images`);
     }
-    setImageFiles(next);
+
+    if (!accepted.length) return;
+
+    setPreviewImages((prev) => [...prev, ...accepted]);
   };
 
   const removeImageAt = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setPreviewImages((prev) => {
+      const target = prev[index];
+      if (target) URL.revokeObjectURL(target.url);
+      return prev.filter((_, i) => i !== index);
+    });
+    setLightboxIndex((prev) => {
+      if (prev === null) return prev;
+      if (prev === index) return null;
+      if (prev > index) return prev - 1;
+      return prev;
+    });
   };
 
   const uploadOne = async (file: File): Promise<string> => {
@@ -203,7 +229,11 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
       }
 
       setContent("");
-      setImageFiles([]);
+      setPreviewImages((prev) => {
+        prev.forEach((image) => URL.revokeObjectURL(image.url));
+        return [];
+      });
+      setLightboxIndex(null);
       toast.success(res?.message ?? "Post created");
       onCreated?.();
     } catch (e) {
@@ -378,6 +408,7 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
                 value={content}
                 onChange={(v) => setContent(v ?? "")}
                 height={260}
+                preview="edit"
                 previewOptions={previewOptions}
                 textareaProps={{
                   placeholder: "Write your post in Markdown…",
@@ -410,7 +441,12 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
                               <div className="w-6 rounded-full bg-base-200">
                                 {u.image ? (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={u.image} alt={u.username} />
+                                  <img
+                                    src={u.image}
+                                    alt={u.username}
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
                                 ) : null}
                               </div>
                             </div>
@@ -449,15 +485,18 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
               </div>
             </div>
 
-            {imagePreviews.length ? (
+            {previewImages.length ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {imagePreviews.map((src, idx) => (
-                  <div key={src} className="relative">
+                {previewImages.map((image, idx) => (
+                  <div key={image.url} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={src}
+                      src={image.url}
                       alt="Selected"
-                      className="rounded-md object-cover w-full h-28"
+                      className="rounded-md object-cover w-full h-28 cursor-zoom-in"
+                      loading="lazy"
+                      decoding="async"
+                      onClick={() => setLightboxIndex(idx)}
                     />
                     <button
                       type="button"
@@ -492,6 +531,17 @@ const CreatePost = ({ onCreated }: { onCreated?: () => void }) => {
                 {uploading ? "Uploading…" : submitting ? "Posting…" : "Post"}
               </button>
             </div>
+
+            <ImageLightbox
+              images={previewImages.map((image) => ({
+                url: image.url,
+                alt: "Selected image preview",
+              }))}
+              index={lightboxIndex ?? 0}
+              open={lightboxIndex !== null}
+              onClose={() => setLightboxIndex(null)}
+              onChange={setLightboxIndex}
+            />
           </>
         )}
       </div>

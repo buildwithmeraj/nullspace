@@ -120,7 +120,13 @@ export default function SuggestedUsers({ limit = 10 }: { limit?: number }) {
                     <div className="w-9 rounded-full bg-base-200">
                       {u.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={u.image} alt={uname || "User"} className="object-cover" />
+                        <img
+                          src={u.image}
+                          alt={uname || "User"}
+                          className="object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : null}
                     </div>
                   </div>

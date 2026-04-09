@@ -1,7 +1,5 @@
-import UpdateProfile from "@/components/auth/UpdateProfile";
-import { Suspense } from "react";
 import type { Metadata } from "next";
-import Loader from "@/components/utilities/Loader";
+import EditProfileView from "@/components/pages/profile/EditProfilePage";
 
 export const metadata: Metadata = {
   title: "Update Profile",
@@ -9,11 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function EditProfilePage() {
-  return (
-    <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-6">
-      <Suspense fallback={<Loader label="Loading…" />}>
-        <UpdateProfile />
-      </Suspense>
-    </div>
-  );
+  return <EditProfileView />;
 }

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { BsSearch } from "react-icons/bs";
 
 type SearchUser = {
   _id: string;
@@ -134,11 +135,13 @@ export default function NavSearch(props: NavSearchProps = {}) {
 
   return (
     <div className="relative" ref={rootRef}>
+      <BsSearch className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-base-content/50" />
       <input
         type="text"
         placeholder="Search"
         ref={inputRef}
-        className={`input input-bordered ${inputClassName ?? "w-48 sm:w-72"}`}
+        id="search"
+        className={`input input-bordered pl-10 ${inputClassName ?? "w-48 sm:w-72"}`}
         value={query}
         onFocus={() => setOpen(true)}
         onChange={(e) => {
@@ -156,7 +159,6 @@ export default function NavSearch(props: NavSearchProps = {}) {
           if (e.key === "Escape") setOpen(false);
         }}
       />
-
       {open ? (
         <div
           className={`absolute mt-1 rounded-md border border-base-300 bg-base-100 shadow-xl z-50 overflow-hidden ${dropdownClassName ?? "-right-3 w-[20rem] max-w-[90vw]"}`}
@@ -216,7 +218,12 @@ export default function NavSearch(props: NavSearchProps = {}) {
                               <div className="w-7 rounded-full bg-base-200">
                                 {u.image ? (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={u.image} alt={u.username} />
+                                  <img
+                                    src={u.image}
+                                    alt={u.username}
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
                                 ) : null}
                               </div>
                             </div>

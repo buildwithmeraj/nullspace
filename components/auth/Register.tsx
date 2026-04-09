@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import ErrorMsg from "@/components/utilities/Error";
+import { FaGoogle, FaUserPlus } from "react-icons/fa6";
 // Define the type for your form data
 interface FormData {
   name: string;
@@ -161,6 +162,7 @@ const Register = () => {
                 className="btn btn-primary mt-4"
                 disabled={loading || uploading}
               >
+                <FaUserPlus size={16} />
                 {uploading || loading ? "Loading..." : "Register"}
               </button>
               <div className="divider my-1">OR</div>
@@ -169,6 +171,7 @@ const Register = () => {
                 className="btn btn-outline"
                 onClick={startGoogleLogin}
               >
+                <FaGoogle className="mt-0.5" />
                 Continue with Google
               </button>
               <p className="my-1 text-center">

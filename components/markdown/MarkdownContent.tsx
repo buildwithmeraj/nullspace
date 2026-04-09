@@ -223,7 +223,10 @@ export default function MarkdownContent({
   );
 
   return (
-    <div data-color-mode={colorMode} className="wmde-markdown">
+    <div
+      data-color-mode={colorMode}
+      className="wmde-markdown rounded-xl !bg-transparent !p-0"
+    >
       <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
         {normalizedSource}
       </ReactMarkdown>

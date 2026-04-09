@@ -12,13 +12,24 @@ import RequireLogin from "@/components/auth/RequireLogin";
 import ErrorMsg from "@/components/utilities/Error";
 import MarkdownContent from "@/components/markdown/MarkdownContent";
 import PostInteractions from "@/components/feed/PostInteractions";
-import LoaderBlock from "@/components/utilities/LoaderBlock";
 import Loader from "@/components/utilities/Loader";
 import PostOwnerActions from "@/components/feed/PostOwnerActions";
 import NotFoundState from "@/components/shared/NotFoundState";
+import ImageLightbox from "@/components/shared/ImageLightbox";
+import PostSkeleton from "@/components/feed/PostSkeleton";
 
-type PostImage = { url: string; publicId?: string; width?: number; height?: number };
-type PostAuthor = { _id: string; name?: string; username?: string; image?: string } | null;
+type PostImage = {
+  url: string;
+  publicId?: string;
+  width?: number;
+  height?: number;
+};
+type PostAuthor = {
+  _id: string;
+  name?: string;
+  username?: string;
+  image?: string;
+} | null;
 type Post = {
   _id: string;
   userId?: string;
@@ -45,6 +56,7 @@ export default function PostDetail({
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
 
   useEffect(() => {
@@ -70,8 +82,13 @@ export default function PostDetail({
 
         // If URL username doesn't match the author username, normalize the URL.
         const authorUsername = String(res.data.user?.username ?? "").trim();
-        if (authorUsername && authorUsername.toLowerCase() !== username.toLowerCase()) {
-          router.replace(`/d/${encodeURIComponent(authorUsername)}/post/${encodeURIComponent(res.data._id)}`);
+        if (
+          authorUsername &&
+          authorUsername.toLowerCase() !== username.toLowerCase()
+        ) {
+          router.replace(
+            `/d/${encodeURIComponent(authorUsername)}/post/${encodeURIComponent(res.data._id)}`,
+          );
           return;
         }
 
@@ -81,7 +98,8 @@ export default function PostDetail({
           if (!cancelled) setNotFound(true);
           return;
         }
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load post");
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : "Failed to load post");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -93,7 +111,13 @@ export default function PostDetail({
   }, [authLoading, postId, router, user, username]);
 
   if (authLoading) return <Loader label="Loading session…" />;
-  if (!user) return <RequireLogin title="Post" message={<span className="text-sm">Log in to view this post.</span>} />;
+  if (!user)
+    return (
+      <RequireLogin
+        title="Post"
+        message={<span className="text-sm">Log in to view this post.</span>}
+      />
+    );
 
   if (notFound) {
     return (
@@ -106,8 +130,14 @@ export default function PostDetail({
     );
   }
 
-  if (error) return <ErrorMsg message={<span className="text-sm">{error}</span>} />;
-  if (loading || !post) return <LoaderBlock />;
+  if (error)
+    return <ErrorMsg message={<span className="text-sm">{error}</span>} />;
+  if (loading || !post)
+    return (
+      <div className="mx-auto w-full max-w-3xl px-3 sm:px-4 py-6">
+        <PostSkeleton />
+      </div>
+    );
 
   const authorUsername = String(post.user?.username ?? "").trim();
   const authorName = String(post.user?.name ?? authorUsername ?? "Unknown");
@@ -133,7 +163,13 @@ export default function PostDetail({
                 <div className="w-10 rounded-full bg-base-200">
                   {post.user?.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={post.user.image} alt="Author" className="object-cover" />
+                    <img
+                      src={post.user.image}
+                      alt="Author"
+                      className="object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : null}
                 </div>
               </div>
@@ -180,21 +216,38 @@ export default function PostDetail({
 
           {post.images?.length ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="col-span-full opacity-50">
+                <i>Images ({post.images?.length})</i>
+              </div>
               {post.images.slice(0, 5).map((img, idx) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={`${post._id}-${idx}`}
                   src={img.url}
                   alt="Post image"
-                  className="rounded-md object-cover w-full h-56"
+                  className="rounded-md object-cover w-full h-56 cursor-zoom-in"
+                  loading="lazy"
+                  decoding="async"
+                  onClick={() => setLightboxIndex(idx)}
                 />
               ))}
             </div>
           ) : null}
 
-          <PostInteractions postId={post._id} />
+          <PostInteractions postId={post._id} defaultCommentsOpen />
         </div>
       </article>
+
+      <ImageLightbox
+        images={(post.images ?? []).map((image, index) => ({
+          url: image.url,
+          alt: `${authorName} image ${index + 1}`,
+        }))}
+        index={lightboxIndex ?? 0}
+        open={lightboxIndex !== null}
+        onClose={() => setLightboxIndex(null)}
+        onChange={setLightboxIndex}
+      />
     </div>
   );
 }

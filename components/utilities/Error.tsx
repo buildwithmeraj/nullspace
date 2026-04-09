@@ -5,7 +5,10 @@ type AlertComponentProps = {
 };
 const ErrorMsg = ({ message }: AlertComponentProps) => {
   return (
-    <div role="alert" className="alert alert-error alert-soft text-sm p-3">
+    <div
+      role="alert"
+      className="alert alert-error alert-soft text-sm p-3 rounded-xl"
+    >
       <CircleX className="-mr-2" size={18} />
       {message}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import toast from "react-hot-toast";
@@ -8,6 +9,11 @@ import toast from "react-hot-toast";
 import { protectedApiRequest } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import MarkdownContent from "@/components/markdown/MarkdownContent";
+import {
+  IoChatbubbleOutline,
+  IoHeartOutline,
+  IoHeartSharp,
+} from "react-icons/io5";
 
 type ReactionSummary = {
   reactionId: string | null;
@@ -15,12 +21,25 @@ type ReactionSummary = {
   count: number;
   lovedByMe: boolean;
 };
-type ReactionSummaryResponse = { success?: boolean; message?: string; data?: ReactionSummary };
+type ReactionSummaryResponse = {
+  success?: boolean;
+  message?: string;
+  data?: ReactionSummary;
+};
 
 type ReactionDoc = { _id?: string; userIds?: unknown[]; postId?: string };
-type ReactionDocResponse = { success?: boolean; message?: string; data?: ReactionDoc };
+type ReactionDocResponse = {
+  success?: boolean;
+  message?: string;
+  data?: ReactionDoc;
+};
 
-type CommentAuthor = { _id: string; name?: string; username?: string; image?: string } | null;
+type CommentAuthor = {
+  _id: string;
+  name?: string;
+  username?: string;
+  image?: string;
+} | null;
 type Comment = {
   _id: string;
   postId: string;
@@ -30,14 +49,28 @@ type Comment = {
   user?: CommentAuthor;
 };
 
-type CommentsResponse = { success?: boolean; message?: string; data?: Comment[] };
-type CommentCreateResponse = { success?: boolean; message?: string; data?: Comment };
+type CommentsResponse = {
+  success?: boolean;
+  message?: string;
+  data?: Comment[];
+};
+type CommentCreateResponse = {
+  success?: boolean;
+  message?: string;
+  data?: Comment;
+};
 
 function countUserIds(userIds: unknown) {
   return Array.isArray(userIds) ? userIds.length : 0;
 }
 
-export default function PostInteractions({ postId }: { postId: string }) {
+export default function PostInteractions({
+  postId,
+  defaultCommentsOpen = false,
+}: {
+  postId: string;
+  defaultCommentsOpen?: boolean;
+}) {
   const { user, loading: authLoading } = useAuth();
   const { resolvedTheme } = useTheme();
   const colorMode: "dark" | "light" =
@@ -58,6 +91,33 @@ export default function PostInteractions({ postId }: { postId: string }) {
   const [commentSubmitting, setCommentSubmitting] = useState(false);
 
   const commentsCount = useMemo(() => comments.length, [comments.length]);
+
+  const fetchComments = async ({ silent = false } = {}) => {
+    if (authLoading || !user) return;
+
+    setCommentsLoading(true);
+    try {
+      const res = await protectedApiRequest<CommentsResponse>({
+        url: `/comments?postId=${encodeURIComponent(postId)}`,
+        method: "GET",
+      });
+      setComments(Array.isArray(res?.data) ? res.data : []);
+    } catch (error) {
+      if (!silent) {
+        const message = axios.isAxiosError(error)
+          ? String(
+              (error.response?.data as { message?: string } | undefined)
+                ?.message ?? error.message,
+            )
+          : error instanceof Error
+            ? error.message
+            : "Failed to load comments";
+        toast.error(message);
+      }
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +143,14 @@ export default function PostInteractions({ postId }: { postId: string }) {
       cancelled = true;
     };
   }, [authLoading, postId, user]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    setCommentsOpen(defaultCommentsOpen);
+    void fetchComments({ silent: true });
+    // We only want the latest auth/post context to trigger a refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, defaultCommentsOpen, postId, user]);
 
   const toggleLove = async () => {
     if (authLoading || !user) return;
@@ -137,20 +205,7 @@ export default function PostInteractions({ postId }: { postId: string }) {
     }
     setCommentsOpen(true);
     if (comments.length) return;
-
-    if (authLoading || !user) return;
-    setCommentsLoading(true);
-    try {
-      const res = await protectedApiRequest<CommentsResponse>({
-        url: `/comments?postId=${encodeURIComponent(postId)}`,
-        method: "GET",
-      });
-      setComments(res?.data ?? []);
-    } catch {
-      toast.error("Failed to load comments");
-    } finally {
-      setCommentsLoading(false);
-    }
+    await fetchComments();
   };
 
   const submitComment = async () => {
@@ -178,15 +233,27 @@ export default function PostInteractions({ postId }: { postId: string }) {
   };
 
   return (
-    <div className="pt-2 space-y-3">
-      <div className="flex items-center gap-2">
+    <div className="pt-2 space-y-3 -mb-4">
+      <div className="flex items-center gap-4">
         <button
           type="button"
-          className={`btn btn-sm ${reaction.lovedByMe ? "btn-error" : "btn-ghost"}`}
+          className={`btn btn-sm btn-ghost`}
           onClick={() => void toggleLove()}
           disabled={reactionLoading || authLoading || !user}
         >
-          {reactionLoading ? "…" : reaction.lovedByMe ? "Loved" : "Love"}{" "}
+          {reactionLoading ? (
+            <span className="loading loading-dots loading-xs" />
+          ) : reaction.lovedByMe ? (
+            <>
+              <IoHeartSharp className="text-red-600" size={17} />
+              Loved
+            </>
+          ) : (
+            <>
+              <IoHeartOutline size={17} />
+              Love
+            </>
+          )}{" "}
           <span className="opacity-70">({reaction.count})</span>
         </button>
         <button
@@ -195,6 +262,7 @@ export default function PostInteractions({ postId }: { postId: string }) {
           onClick={() => void openComments()}
           disabled={authLoading || !user}
         >
+          <IoChatbubbleOutline size={15} />
           Comment <span className="opacity-70">({commentsCount})</span>
         </button>
       </div>
@@ -203,7 +271,11 @@ export default function PostInteractions({ postId }: { postId: string }) {
         <div className="rounded-md border border-base-300 bg-base-100 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium">Comments</div>
-            <button type="button" className="btn btn-xs btn-ghost" onClick={() => setCommentsOpen(false)}>
+            <button
+              type="button"
+              className="btn btn-xs btn-ghost"
+              onClick={() => setCommentsOpen(false)}
+            >
               Close
             </button>
           </div>
@@ -240,23 +312,38 @@ export default function PostInteractions({ postId }: { postId: string }) {
                       <div className="w-8 rounded-full bg-base-200">
                         {u?.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={u.image} alt="Author" />
+                          <img
+                            src={u.image}
+                            alt="Author"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         ) : null}
                       </div>
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm">
                         {uname ? (
-                          <Link className="font-semibold link link-hover" href={`/d/${encodeURIComponent(uname)}`}>
+                          <Link
+                            className="font-semibold link link-hover"
+                            href={`/d/${encodeURIComponent(uname)}`}
+                          >
                             {String(u?.name ?? uname)}
                           </Link>
                         ) : (
-                          <span className="font-semibold">{String(u?.name ?? "User")}</span>
+                          <span className="font-semibold">
+                            {String(u?.name ?? "User")}
+                          </span>
                         )}
-                        {uname ? <span className="opacity-70"> @{uname}</span> : null}
+                        {uname ? (
+                          <span className="opacity-70"> @{uname}</span>
+                        ) : null}
                       </div>
                       <div className="text-sm">
-                        <MarkdownContent source={c.content} colorMode={colorMode} />
+                        <MarkdownContent
+                          source={c.content}
+                          colorMode={colorMode}
+                        />
                       </div>
                     </div>
                   </div>

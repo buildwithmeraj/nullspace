@@ -5,7 +5,10 @@ type AlertComponentProps = {
 };
 const InfoMSg = ({ message }: AlertComponentProps) => {
   return (
-    <div role="alert" className="alert alert-info alert-soft text-sm p-3">
+    <div
+      role="alert"
+      className="alert alert-info alert-soft text-sm p-3 rounded-xl"
+    >
       <GrInfo className="-mr-2" size={18} />
       {message}
     </div>
